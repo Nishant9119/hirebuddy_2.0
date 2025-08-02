@@ -216,7 +216,7 @@ const DatabaseTest: React.FC = () => {
               <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
                 <li>Check that your environment variables are set in your deployment platform (Netlify, Vercel, etc.)</li>
                 <li>Verify that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are correctly configured</li>
-                <li>Ensure the email_database table exists in your Supabase database</li>
+                <li>Ensure the testdb table exists in your Supabase database</li>
                 <li>Check your Supabase project settings and RLS policies</li>
                 <li>Verify that your Supabase project is active and not paused</li>
               </ul>

@@ -17,7 +17,7 @@ export async function testDatabaseConnection(): Promise<DatabaseTestResult> {
 
     // Test basic connection
     const { data, error, count } = await supabase
-      .from('email_database')
+      .from('testdb')
       .select('*', { count: 'exact' });
 
     if (error) {
@@ -69,7 +69,7 @@ export async function addSampleContact(): Promise<DatabaseTestResult> {
     };
 
     const { data, error } = await supabase
-      .from('email_database')
+      .from('testdb')
       .insert([sampleContact])
       .select()
       .single();
