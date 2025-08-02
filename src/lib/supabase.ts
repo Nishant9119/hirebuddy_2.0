@@ -33,7 +33,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const testConnection = async () => {
   try {
     const { data, error } = await supabase
-      .from('hirebuddy_job_board')
+      .from('testdb')
       .select('count', { count: 'exact', head: true })
       .limit(1);
     

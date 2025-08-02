@@ -17,6 +17,8 @@ import { usePremiumUser } from '@/hooks/usePremiumUser';
 import { PremiumBadge } from '@/components/ui/premium-badge';
 import { googleAuthService, GoogleUser, GoogleContact } from '@/services/googleAuthService';
 import emailService from '@/services/emailService';
+import { supabase } from '@/lib/supabase';
+import { conversationService } from '@/services/conversationService';
 import { DashboardService } from '@/services/dashboardService';
 import { 
   Mail, 
@@ -260,19 +262,19 @@ const EmailOutreach = () => {
   // Load email stats
   const loadEmailStats = async () => {
     try {
-      const [emailsSent, followupsNeeded, repliesReceived, totalContacts] = await Promise.all([
-        DashboardService.getEmailsSentCount(),
-        DashboardService.getFollowupsNeededCount(),
-        DashboardService.getRepliesReceivedCount(),
-        DashboardService.getTotalContactsCount()
-      ]);
+      const emailStats = await DashboardService.getEmailOutreachStats();
       
-      setEmailsSentCount(emailsSent);
-      setFollowupsNeededCount(followupsNeeded);
-      setRepliesReceivedCount(repliesReceived);
-      setTotalContactsCount(totalContacts);
+      setEmailsSentCount(emailStats.total_emails_sent);
+      setFollowupsNeededCount(0); // This would need a separate implementation
+      setRepliesReceivedCount(Math.floor(emailStats.total_emails_sent * emailStats.response_rate / 100));
+      setTotalContactsCount(contacts.length);
     } catch (error) {
       console.error('Error loading email stats:', error);
+      // Set default values on error
+      setEmailsSentCount(0);
+      setFollowupsNeededCount(0);
+      setRepliesReceivedCount(0);
+      setTotalContactsCount(contacts.length);
     }
   };
 
@@ -396,10 +398,43 @@ const EmailOutreach = () => {
               isHtml
             );
           } else {
-            // Use simulation mode or AWS API
-            console.log(`Simulating email send to ${contact.email}`);
-            // In simulation, we just log the email
-            await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+            // Use AWS API for actual email sending
+            console.log(`Sending email via AWS API to ${contact.email}`);
+            
+            // Get user's email from auth context
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user?.email) {
+              throw new Error('User email not found. Please sign in again.');
+            }
+            
+            // Use emailService to send via AWS API
+            const request = {
+              sender: user.email,
+              to: contact.email,
+              subject: subject,
+              body: emailService.getFormattedEmailContent(body),
+              isHtml: isHtml,
+              content_type: isHtml ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8',
+              mime_type: isHtml ? 'text/html' : 'text/plain'
+            };
+            
+            const response = await emailService.sendEmail(request);
+            
+            // Save email to conversation history
+            try {
+              await conversationService.saveEmailToConversation({
+                contact_id: contact.id,
+                sender_email: user.email,
+                recipient_email: contact.email,
+                subject: subject,
+                body: body,
+                email_type: 'outbound',
+                message_id: response.messageId,
+                thread_id: response.threadId
+              });
+            } catch (convError) {
+              console.warn('Failed to save email to conversation history:', convError);
+            }
           }
           
           successCount++;
@@ -422,11 +457,11 @@ const EmailOutreach = () => {
       // Show results
       if (successCount > 0) {
         toast.success(
-          `Successfully ${useGmailMode ? 'sent' : 'simulated'} ${successCount} email${successCount !== 1 ? 's' : ''}`
+          `Successfully sent ${successCount} email${successCount !== 1 ? 's' : ''}`
         );
         
         // Update email count for premium users
-        if (isPremium && useGmailMode) {
+        if (isPremium) {
           try {
             await incrementEmailCount(successCount);
           } catch (error) {
