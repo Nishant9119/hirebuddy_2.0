@@ -1,5 +1,6 @@
 import { Job, JobSearchParams } from '../types/job';
 import { apiClient, ApiResponse } from '../lib/api';
+import { supabase } from '../lib/supabase';
 
 // Define API response types for proper type safety
 interface JobsApiResponse {
@@ -542,15 +543,76 @@ export class JobService {
     companies: number;
   }> {
     try {
+      // Try API first, fallback to direct database query
       const response = await apiClient.getJobsStats() as ApiResponse<JobStatsResponse>;
 
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch job stats');
+      if (response.success && response.data) {
+        return response.data;
+      }
+    } catch (error) {
+      console.warn('API stats failed, falling back to direct database query:', error);
+    }
+
+    // Fallback to direct database queries
+    try {
+      
+      // Get total jobs count from testdb table
+      const { count: totalCount, error: totalError } = await supabase
+        .from('testdb')
+        .select('*', { count: 'exact' });
+
+      if (totalError) {
+        console.error('Error getting total count:', totalError);
       }
 
-      return response.data || { total: 0, remote: 0, thisWeek: 0, companies: 0 };
-    } catch (error) {
-      console.error('Error fetching job stats:', error);
+      // Get remote jobs count (check title for remote keywords)
+      const { count: remoteCount, error: remoteError } = await supabase
+        .from('testdb')
+        .select('*', { count: 'exact' })
+        .or('title.ilike.%remote%,title.ilike.%work from home%,title.ilike.%wfh%');
+
+      if (remoteError) {
+        console.error('Error getting remote count:', remoteError);
+      }
+
+      // Get companies count (distinct company names)
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('testdb')
+        .select('company_name')
+        .not('company_name', 'is', null);
+
+      let companiesCount = 0;
+      if (!companiesError && companiesData) {
+        const uniqueCompanies = new Set(companiesData.map(item => item.company_name));
+        companiesCount = uniqueCompanies.size;
+      }
+
+      // Get this week's jobs count
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
+      const { count: thisWeekCount, error: weekError } = await supabase
+        .from('testdb')
+        .select('*', { count: 'exact' })
+        .gte('created_at', oneWeekAgo.toISOString());
+
+      if (weekError) {
+        console.error('Error getting this week count:', weekError);
+      }
+
+      const stats = {
+        total: totalCount || 0,
+        remote: remoteCount || 0,
+        thisWeek: thisWeekCount || 0,
+        companies: companiesCount
+      };
+
+      console.log('Direct database stats:', stats);
+      return stats;
+      
+    } catch (dbError) {
+      console.error('Error fetching job stats from database:', dbError);
+      // Return default values
       return { total: 0, remote: 0, thisWeek: 0, companies: 0 };
     }
   }
