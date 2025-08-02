@@ -46,7 +46,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import MobileCard from '@/components/mobile/MobileCard';
+
 import MobileButton from '@/components/mobile/MobileButton';
 import { EmailUsageProgress } from '@/components/email/EmailUsageProgress';
 import { SubscriptionRenewalDialog } from '@/components/email/SubscriptionRenewalDialog';
@@ -91,153 +91,46 @@ const EmailOutreach = () => {
     
     setIsLoadingContacts(true);
     try {
-      const googleContactsData = await googleAuthService.getContacts(googleUser.access_token);
-      setGoogleContacts(googleContactsData);
+      const contactsData = await googleAuthService.getContacts(googleUser.access_token);
+      setGoogleContacts(contactsData);
       
-      // Convert Google contacts to display format
-      const displayContacts: ContactForDisplay[] = googleContactsData.map(contact => ({
-        id: contact.id,
-        name: contact.name,
-        email: contact.email,
-        phone: contact.phone || '',
+      // Convert Google contacts to our contact format
+      const convertedContacts: ContactForDisplay[] = contactsData.map(contact => ({
+        id: contact.id || '',
+        name: contact.name || 'Unknown',
+        email: contact.email || '',
         company: contact.company || '',
         title: contact.title || '',
-        status: 'active',
+        phone: contact.phone || '',
+        linkedin_link: '',
+        company_website: '',
+        email_sent_on: '',
+        status: 'active' as const,
         email_sent: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }));
       
-      setContacts(displayContacts);
-      toast.success(`Loaded ${googleContactsData.length} contacts from Google`);
+      setContacts(convertedContacts);
+      console.log(`Loaded ${convertedContacts.length} contacts from Gmail`);
     } catch (error) {
       console.error('Error loading Google contacts:', error);
-      toast.error('Failed to load Google contacts');
+      toast.error('Failed to load Gmail contacts');
     } finally {
       setIsLoadingContacts(false);
     }
   };
 
-  // Handle Gmail authentication
-  const handleGmailAuth = async () => {
-    setIsGoogleAuthenticating(true);
-    setHasAttemptedAuth(true);
-    try {
-      await googleAuthService.initiateAuth();
-    } catch (error) {
-      console.error('Error initiating Google auth:', error);
-      toast.error('Failed to initiate Gmail authentication');
-      setIsGoogleAuthenticating(false);
-    }
-  };
-
-  // Handle successful authentication
-  const handleAuthSuccess = useCallback((user: GoogleUser) => {
-    setGoogleUser(user);
-    setIsGoogleAuthenticating(false);
-    setShowAuthOptions(false);
-    
-    toast.success('Gmail authentication successful!');
-    
-    console.log('Gmail authentication details:', {
-      email: user.email,
-      hasAccessToken: !!user.access_token,
-      hasRefreshToken: !!user.refresh_token,
-      provider: user.provider
-    });
-  }, []);
-
-  // Check authentication status and refresh if needed
-  const checkAuthStatus = async () => {
-    if (!googleUser) return;
-    
-    try {
-      setIsGoogleAuthenticating(true);
-      const refreshedUser = await googleAuthService.getStoredUser();
-      
-      if (refreshedUser) {
-        setGoogleUser(refreshedUser);
-        toast.success('Authentication verified');
-      } else {
-        setGoogleUser(null);
-        toast.warning('Authentication expired. Please re-authenticate.');
-        setShowAuthOptions(true);
-      }
-    } catch (error) {
-      console.error('Error checking auth status:', error);
-      toast.error('Error checking authentication status');
-    } finally {
-      setIsGoogleAuthenticating(false);
-    }
-  };
-
-  // Handle forced reauthentication - clears existing auth and starts fresh
-  const handleForceReauth = async () => {
-    try {
-      setIsGoogleAuthenticating(true);
-      
-      // Clear existing authentication data
-      if (googleUser) {
-        await googleAuthService.clearStoredAuth();
-        setGoogleUser(null);
-        toast.info('Previous authentication cleared');
-      }
-      
-      // Start fresh authentication with force reauth flag
-      await googleAuthService.initiateAuth(true);
-    } catch (error) {
-      console.error('Error during forced reauthentication:', error);
-      toast.error('Failed to initiate reauthentication');
-      setIsGoogleAuthenticating(false);
-    }
-  };
-
-  // Switch between Gmail and Database modes
-  const switchToGmailMode = () => {
-    if (!googleUser) {
-      setShowAuthOptions(true);
-      toast.warning('Please authenticate with Gmail first');
-      return;
-    }
-    setUseGmailMode(true);
-    loadGoogleContacts();
-  };
-
-  const switchToDatabaseMode = () => {
-    setUseGmailMode(false);
-    setShowAuthOptions(false);
-    loadContactsFromDatabase();
-  };
-
-  // Load contacts from Supabase database (filtered for compose section - no emails sent in last 7 days)
+  // Load contacts from database
   const loadContactsFromDatabase = async () => {
     setIsLoadingContacts(true);
     try {
-      console.log('🔍 Loading contacts from database (available for email)...');
-      
-      // First test the database connection
-      const testResult = await testDatabaseConnection();
-      if (!testResult.success) {
-        console.error('Database connection test failed:', testResult);
-        toast.error(`Database connection failed: ${testResult.message}`);
-        setDatabaseConnected(false);
-        return;
-      }
-
-      setDatabaseConnected(true);
-      // Use the new method that filters contacts based on 7-day rule
-      const contactsData = await contactsService.getContactsAvailableForEmail();
+      const contactsData = await contactsService.getContacts();
       setContacts(contactsData);
-      
-      if (contactsData.length > 0) {
-        toast.success(`Loaded ${contactsData.length} contacts available for email (no emails sent in last 7 days)`);
-      } else {
-        toast.info('No contacts available for email - all contacts have been emailed within the last 7 days');
-      }
+      console.log(`Loaded ${contactsData.length} contacts from database`);
     } catch (error) {
-      console.error('Error loading contacts from database:', error);
-      toast.error(`Failed to load contacts from database: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setDatabaseConnected(false);
+      console.error('Error loading database contacts:', error);
+      toast.error('Failed to load contacts from database');
     } finally {
       setIsLoadingContacts(false);
     }
@@ -246,56 +139,77 @@ const EmailOutreach = () => {
   // Test AWS API connection
   const testAwsApiConnection = async () => {
     try {
-      const result = await emailService.testConnection();
+      const result = await testDatabaseConnection();
+      setDatabaseConnected(result.success);
       setAwsApiStatus({
         connected: result.success,
-        message: result.success ? 'Email service ready' : result.message
+        message: result.success ? 'Connected to AWS API' : 'Failed to connect to AWS API' 
       });
     } catch (error) {
-      setAwsApiStatus({
-        connected: false,
-        message: 'Email service unavailable'
-      });
+      console.error('AWS API connection test failed:', error);
+      setAwsApiStatus({ connected: false, message: 'AWS API connection failed' });
     }
   };
+
+  // Handle Google authentication
+  const handleGoogleAuthentication = async () => {
+    setIsGoogleAuthenticating(true);
+    try {
+      await googleAuthService.initiateAuth();
+    } catch (error) {
+      console.error('Google authentication failed:', error);
+      toast.error('Failed to start Google authentication');
+      setIsGoogleAuthenticating(false);
+    }
+  };
+
+  // Handle authentication success
+  const handleAuthSuccess = useCallback((user: GoogleUser) => {
+    setGoogleUser(user);
+    setUseGmailMode(true);
+    setHasAttemptedAuth(true);
+    
+    toast.success(`Successfully authenticated as ${user.email}`);
+    console.log('Authentication successful:', user.email);
+    
+    // Load Google contacts after successful authentication
+    loadGoogleContacts();
+  }, []);
 
   // Load email stats
   const loadEmailStats = async () => {
     try {
-      const emailStats = await DashboardService.getEmailOutreachStats();
-      
-      setEmailsSentCount(emailStats.total_emails_sent);
-      setFollowupsNeededCount(0); // This would need a separate implementation
-      setRepliesReceivedCount(Math.floor(emailStats.total_emails_sent * emailStats.response_rate / 100));
-      setTotalContactsCount(contacts.length);
+      const stats = await DashboardService.getEmailOutreachStats();
+      setEmailsSentCount(stats.total_emails_sent);
+      setFollowupsNeededCount(0); // This field doesn't exist in the API response
+      setRepliesReceivedCount(Math.round(stats.total_emails_sent * stats.response_rate / 100));
+      setTotalContactsCount(0); // This field doesn't exist in the API response
     } catch (error) {
       console.error('Error loading email stats:', error);
-      // Set default values on error
-      setEmailsSentCount(0);
-      setFollowupsNeededCount(0);
-      setRepliesReceivedCount(0);
-      setTotalContactsCount(contacts.length);
     }
   };
 
-  // Check for OAuth callback authentication
+  // Check for OAuth callback in URL
   const checkForCallbackAuth = useCallback(async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
-    const state = urlParams.get('state');
+    const scope = urlParams.get('scope');
     
-    if (code && state === 'email_outreach') {
+    if (code && scope) {
       setIsGoogleAuthenticating(true);
+      console.log('OAuth callback detected, exchanging code for tokens...');
       
       try {
         const user = await googleAuthService.handleCallback(code);
-        handleAuthSuccess(user);
         
-        // Clean up URL
+        // Clear URL parameters
         window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Handle successful authentication
+        handleAuthSuccess(user);
       } catch (error) {
-        console.error('Error handling OAuth callback:', error);
-        toast.error('Failed to complete authentication');
+        console.error('Error exchanging code for tokens:', error);
+        toast.error('Authentication failed. Please try again.');
       } finally {
         setIsGoogleAuthenticating(false);
       }
@@ -360,36 +274,29 @@ const EmailOutreach = () => {
   };
 
   const handleEmailSend = async (subject: string, body: string, isHtml: boolean) => {
-    if (selectedContacts.length === 0) {
-      toast.error('No contacts selected');
-      return;
-    }
+    setIsSending(true);
 
-    // Check email limits before sending (only for premium users)
-    if (isPremium) {
+    try {
       const canSendResult = await checkCanSendEmails(selectedContacts.length);
       if (!canSendResult.canSend) {
-        toast.error(canSendResult.message || 'Email limit exceeded');
-        setShowRenewalDialog(true);
+        toast.error(canSendResult.message || 'You have reached your email limit. Please upgrade your plan.');
         return;
-      }
     }
 
-    setIsSending(true);
-    
-    try {
       const selectedContactsData = contacts.filter(contact => 
         selectedContacts.includes(contact.id)
       );
 
+      console.log('Sending emails to:', selectedContactsData.length, 'contacts');
+      
+      // Send emails one by one
       let successCount = 0;
       let failureCount = 0;
 
-      // Send emails to selected contacts
       for (const contact of selectedContactsData) {
         try {
           if (useGmailMode && googleUser) {
-            // Use Gmail API for sending
+            // Use Gmail API to send
             await googleAuthService.sendEmail(
               googleUser.access_token,
               contact.email,
@@ -398,54 +305,26 @@ const EmailOutreach = () => {
               isHtml
             );
           } else {
-            // Use AWS API for actual email sending
-            console.log(`Sending email via AWS API to ${contact.email}`);
-            
-            // Get user's email from auth context
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user?.email) {
-              throw new Error('User email not found. Please sign in again.');
-            }
-            
-            // Use emailService to send via AWS API
-            const request = {
-              sender: user.email,
+            // Use AWS SES to send
+            await emailService.sendEmail({
+              sender: 'noreply@hirebuddy.co',
               to: contact.email,
-              subject: subject,
-              body: emailService.getFormattedEmailContent(body),
-              isHtml: isHtml,
-              content_type: isHtml ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8',
-              mime_type: isHtml ? 'text/html' : 'text/plain'
-            };
-            
-            const response = await emailService.sendEmail(request);
-            
-            // Save email to conversation history
-            try {
-              await conversationService.saveEmailToConversation({
-                contact_id: contact.id,
-                sender_email: user.email,
-                recipient_email: contact.email,
-                subject: subject,
-                body: body,
-                email_type: 'outbound',
-                message_id: response.messageId,
-                thread_id: response.threadId
-              });
-            } catch (convError) {
-              console.warn('Failed to save email to conversation history:', convError);
-            }
+              subject,
+              body,
+              isHtml
+            });
           }
           
           successCount++;
           
-                     // Update contact status in database if using database mode
-           if (!useGmailMode) {
-             try {
-               await contactsService.markEmailSent(contact.id);
-             } catch (dbError) {
-               console.warn('Failed to update contact status in database:', dbError);
-             }
+          // Increment email count
+          await incrementEmailCount(1);
+          
+                    // Track the sent email in conversations
+          try {
+            await conversationService.createConversationThread(contact.id, subject);
+          } catch (convError) {
+            console.warn('Failed to create conversation thread:', convError);
            }
           
         } catch (error) {
@@ -456,35 +335,23 @@ const EmailOutreach = () => {
 
       // Show results
       if (successCount > 0) {
-        toast.success(
-          `Successfully sent ${successCount} email${successCount !== 1 ? 's' : ''}`
-        );
+        toast.success(`Successfully sent ${successCount} email(s)`);
         
-        // Update email count for premium users
-        if (isPremium) {
-          try {
-            await incrementEmailCount(successCount);
-          } catch (error) {
-            console.error('Failed to update email count:', error);
-          }
-        }
+        // Update email stats
+        setEmailsSentCount(prev => prev + successCount);
+        
+        // Refresh usage after sending
+        await refreshUsage();
       }
       
       if (failureCount > 0) {
-        toast.error(`Failed to send ${failureCount} email${failureCount !== 1 ? 's' : ''}`);
-      }
-
-      // Refresh contacts to show updated email sent status
-      if (!useGmailMode) {
-        await loadContactsFromDatabase();
+        toast.error(`Failed to send ${failureCount} email(s)`);
       }
       
-      // Refresh email stats
-      await loadEmailStats();
-      
-      // Close composer and clear selection
+      // Close composer
       setIsComposerOpen(false);
       setSelectedContacts([]);
+      
     } catch (error) {
       console.error('Error sending emails:', error);
       toast.error('Failed to send emails');
@@ -533,181 +400,17 @@ const EmailOutreach = () => {
                   <BreadcrumbPage className="font-semibold flex items-center gap-2">
                     <Mail className="w-4 h-4" />
                     Email Outreach
-                    {isPremium && (
-                      <PremiumBadge variant="compact" />
-                    )}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
           
-          
         </header>
 
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
-          {/* Premium Restriction Overlay */}
-          {!isPremium && !premiumLoading && (
-            <div className="relative h-full">
-              {/* Blurred Content */}
-              <div className="filter blur-sm pointer-events-none">
-                <div className="p-6 space-y-6">
-                  {/* Mock Gmail Authentication Section */}
-                  <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-blue-100 p-2 rounded-full">
-                            <Shield className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-blue-900">Premium Email Outreach</h3>
-                            <p className="text-sm text-blue-700">
-                              Connect with recruiters and hiring managers
-                            </p>
-                          </div>
-                        </div>
-                        <Badge className="bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-yellow-900 border-yellow-300">
-                          <Crown className="w-3 h-3 mr-1" />
-                          Premium
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Mock Stats Dashboard */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Total Contacts</p>
-                            <p className="text-2xl font-bold text-gray-900">{totalContactsCount}</p>
-                          </div>
-                          <div className="bg-blue-100 p-3 rounded-full">
-                            <Users className="h-6 w-6 text-blue-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Emails Sent</p>
-                            <p className="text-2xl font-bold text-gray-900">89</p>
-                          </div>
-                          <div className="bg-green-100 p-3 rounded-full">
-                            <Mail className="h-6 w-6 text-green-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Response Rate</p>
-                            <p className="text-2xl font-bold text-gray-900">23%</p>
-                          </div>
-                          <div className="bg-orange-100 p-3 rounded-full">
-                            <AlertCircle className="h-6 w-6 text-orange-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Interviews</p>
-                            <p className="text-2xl font-bold text-gray-900">12</p>
-                          </div>
-                          <div className="bg-purple-100 p-3 rounded-full">
-                            <CheckCircle className="h-6 w-6 text-purple-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Mock Email Composer */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Premium Email Composer</CardTitle>
-                      <CardDescription>
-                        Advanced email templates and AI-powered personalization
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="bg-gray-100 rounded-lg p-4 h-32"></div>
-                        <div className="flex gap-2">
-                          <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-                            <Send className="w-4 h-4 mr-2" />
-                            Send Campaign
-                          </Button>
-                          <Button variant="outline">Schedule</Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              {/* Premium Upgrade Overlay */}
-              <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center p-6">
-                <div className="text-center max-w-lg">
-                  <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Lock className="w-12 h-12 text-white" />
-                  </div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                    Premium Email Outreach
-                  </h2>
-                  <p className="text-lg text-gray-600 mb-6">
-                    Unlock powerful email outreach tools to connect with recruiters and hiring managers. 
-                    Send personalized campaigns, track responses, and land more interviews.
-                  </p>
-                  
-                  <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                    <h3 className="font-semibold text-yellow-800 mb-2">Premium Features Include:</h3>
-                    <ul className="text-sm text-yellow-700 space-y-1">
-                      <li>• Unlimited email campaigns</li>
-                      <li>• AI-powered email templates</li>
-                      <li>• Advanced analytics and tracking</li>
-                      <li>• Gmail integration</li>
-                      <li>• Response management</li>
-                      <li>• Follow-up automation</li>
-                    </ul>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <a 
-                      href="https://payments.cashfree.com/forms/hirebuddy_premium_subscription" 
-                      target="_parent"
-                      className="block w-full"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <Button className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-semibold py-3 text-lg">
-                        <Crown className="w-5 h-5 mr-2" />
-                        Upgrade to Premium
-                      </Button>
-                    </a>
-                    <p className="text-sm text-gray-500">
-                      Join thousands of professionals who accelerated their job search
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Regular Content for Premium Users */}
-          {isPremium && (
+          {/* Content accessible to all users */}
             <div className="p-4 md:p-6 space-y-4 md:space-y-6">
               {/* Re-authentication Section */}
               <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -738,355 +441,82 @@ const EmailOutreach = () => {
                         </p>
                       </div>
                     </div>
-                    
-                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 flex-shrink-0">
+                  <div className="flex gap-2 flex-wrap flex-shrink-0">
                       {googleUser && (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 w-fit text-xs px-2 py-1">
-                          <CheckCircle className="h-2 w-2 md:h-3 md:w-3 mr-1" />
+                      <Badge className="text-xs bg-green-100 text-green-800 border-green-200">
+                        <CheckCircle className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" />
                           Connected
                         </Badge>
                       )}
-                      
-                      {/* Mobile Action Buttons */}
-                      <div className="md:hidden space-y-1.5">
-                        <button
-                          onClick={googleUser ? checkAuthStatus : handleGmailAuth}
-                          disabled={isGoogleAuthenticating}
-                          className={`w-full px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                            googleUser 
-                              ? 'border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 disabled:opacity-50' 
-                              : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center gap-1.5">
-                            {isGoogleAuthenticating ? (
-                              <>
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                                <span>{googleUser ? 'Verifying...' : 'Connecting...'}</span>
-                              </>
-                            ) : (
-                              <>
-                                {googleUser ? (
-                                  <>
-                                    <RefreshCw className="h-3 w-3" />
-                                    <span>Verify Connection</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Mail className="h-3 w-3" />
-                                    <span>Connect Gmail</span>
-                                  </>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </button>
-                        
-                        {googleUser && (
-                          <button
-                            onClick={handleForceReauth}
-                            disabled={isGoogleAuthenticating}
-                            className="w-full px-3 py-2 text-xs font-medium rounded-md transition-colors border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                          >
-                            <div className="flex items-center justify-center gap-1.5">
-                              {isGoogleAuthenticating ? (
-                                <>
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                  <span>Reauthenticating...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Shield className="h-3 w-3" />
-                                  <span>Re-authenticate</span>
-                                </>
-                              )}
-                            </div>
-                          </button>
-                        )}
-                      </div>
-                      
-                      {/* Desktop Action Buttons */}
-                      <div className="hidden md:flex items-center gap-2">
                         <Button
-                          onClick={googleUser ? checkAuthStatus : handleGmailAuth}
-                          disabled={isGoogleAuthenticating}
-                          variant={googleUser ? "outline" : "default"}
+                      onClick={() => setShowAuthOptions(!showAuthOptions)}
+                      variant="outline"
                           size="sm"
-                          className={`flex items-center gap-2 ${googleUser ? 'text-gray-700' : 'text-white'}`}
+                      disabled={isGoogleAuthenticating}
+                      className="text-xs px-2 py-1"
                         >
                           {isGoogleAuthenticating ? (
                             <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              {googleUser ? 'Verifying...' : 'Connecting...'}
-                            </>
-                          ) : (
-                            <>
-                              {googleUser ? (
-                                <>
-                                  <RefreshCw className="h-4 w-4" />
-                                  Verify
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          <span className="hidden md:inline">Authenticating...</span>
+                          <span className="md:hidden">Auth...</span>
+                        </>
+                      ) : googleUser ? (
+                        <>
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          <span className="hidden md:inline">Re-authenticate</span>
+                          <span className="md:hidden">Re-auth</span>
                                 </>
                               ) : (
                                 <>
-                                  <Mail className="h-4 w-4" />
-                                  Connect Gmail
-                                </>
-                              )}
+                          <Shield className="h-3 w-3 mr-1" />
+                          <span className="hidden md:inline">Authenticate</span>
+                          <span className="md:hidden">Auth</span>
                             </>
                           )}
                         </Button>
-                        
-                        {googleUser && (
-                          <Button
-                            onClick={handleForceReauth}
-                            disabled={isGoogleAuthenticating}
-                            variant="secondary"
-                            size="sm"
-                            className="flex items-center gap-2"
-                          >
-                            {isGoogleAuthenticating ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Reauthenticating...
-                              </>
-                            ) : (
-                              <>
-                                <Shield className="h-4 w-4" />
-                                Re-authenticate
-                              </>
-                            )}
-                          </Button>
-                        )}
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
 
               {/* Authentication Options */}
               {showAuthOptions && (
-                <Card className="border-blue-200 bg-blue-50/50">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-blue-600" />
-                      Email Configuration
-                    </CardTitle>
-                    <CardDescription>
-                      Manage your Gmail authentication settings and troubleshoot connection issues
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Alert className="border-blue-200 bg-blue-50">
-                      <Info className="h-4 w-4 text-blue-600" />
-                      <AlertDescription className="text-blue-800">
-                        <strong>When to reauthenticate:</strong> If you're getting permission errors, emails aren't sending, 
-                        or you've changed your Google account password, use the "Force Re-authenticate" option below.
-                      </AlertDescription>
-                    </Alert>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      
-                      
-                    </div>
-                    
-                    {!googleUser && (
-                      <div className="pt-4 border-t">
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <div className="flex flex-col sm:flex-row gap-2">
                         <Button
-                          onClick={handleGmailAuth}
-                          disabled={isGoogleAuthenticating}
-                          className="w-full"
-                        >
-                          {isGoogleAuthenticating ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Authenticating...
-                            </>
-                          ) : (
-                            <>
-                              <Mail className="h-4 w-4 mr-2" />
-                              Authenticate with Gmail
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                    
-                    {googleUser && (
-                      <div className="pt-4 border-t space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <ShieldCheck className="h-4 w-4 text-green-600" />
-                            <span className="text-sm font-medium">Authenticated as {googleUser.email}</span>
-                          </div>
-                          <Button
-                            onClick={checkAuthStatus}
-                            variant="outline"
+                        onClick={async () => {
+                          setShowAuthOptions(false);
+                          await handleGoogleAuthentication();
+                        }}
+                        variant="default"
                             size="sm"
                             disabled={isGoogleAuthenticating}
-                          >
-                            {isGoogleAuthenticating ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <RefreshCw className="h-4 w-4" />
-                            )}
+                        className="text-xs"
+                      >
+                        <Shield className="h-3 w-3 mr-1" />
+                        <span>Gmail OAuth</span>
                           </Button>
-                        </div>
-                        
-                        {/* Reauthentication Options */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                          <h4 className="font-medium text-blue-900 mb-2">Having Issues?</h4>
-                          <p className="text-sm text-blue-700 mb-3">
-                            If you're experiencing problems sending emails or accessing your Gmail, try reauthenticating.
-                          </p>
-                          <div className="flex gap-2">
                             <Button
-                              onClick={handleForceReauth}
-                              disabled={isGoogleAuthenticating}
+                        onClick={() => {
+                          setShowAuthOptions(false);
+                          setUseGmailMode(false);
+                          setGoogleUser(null);
+                          googleAuthService.clearStoredAuth();
+                          loadContactsFromDatabase();
+                        }}
                               variant="outline"
                               size="sm"
-                              className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                            >
-                              {isGoogleAuthenticating ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  Reauthenticating...
-                                </>
-                              ) : (
-                                <>
-                                  <Shield className="h-4 w-4 mr-2" />
-                                  Force Re-authenticate
-                                </>
-                              )}
+                        className="text-xs"
+                      >
+                        <Database className="h-3 w-3 mr-1" />
+                        <span>Use Database Contacts</span>
                             </Button>
-                            <Button
-                              onClick={checkAuthStatus}
-                              disabled={isGoogleAuthenticating}
-                              variant="outline"
-                              size="sm"
-                              className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                            >
-                              {isGoogleAuthenticating ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <RefreshCw className="h-4 w-4 mr-2" />
-                                  Verify Status
-                                </>
-                              )}
-                            </Button>
-                          </div>
                         </div>
                       </div>
                     )}
                   </CardContent>
                 </Card>
-              )}
 
-              {/* Connection Status */}
-              {!useGmailMode && !databaseConnected && (
-                <Alert className="border-amber-200 bg-amber-50">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-800">
-                    <strong>Connection Issue:</strong> Unable to load contacts from the database. 
-                    Please check your connection and try refreshing.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Stats Dashboard */}
-              {/* Mobile Stats */}
-              <div className="md:hidden space-y-2">
-                <Card className="border border-gray-200 shadow-sm">
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Users className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-gray-600">Total Contacts</div>
-                          <div className="text-lg font-bold text-gray-900">{totalContactsCount}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-1 text-xs font-medium text-blue-600">
-                          <TrendingUp className="h-3 w-3" />
-                          <span className="text-xs">Active</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border border-gray-200 shadow-sm">
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                          <Mail className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-gray-600">Emails Sent</div>
-                          <div className="text-lg font-bold text-gray-900">{emailsSentCount}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-1 text-xs font-medium text-green-600">
-                          <Send className="h-3 w-3" />
-                          <span className="text-xs">Delivered</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border border-gray-200 shadow-sm">
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                          <AlertCircle className="h-4 w-4 text-orange-600" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-gray-600">Follow Ups Needed</div>
-                          <div className="text-lg font-bold text-gray-900">{followupsNeededCount}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-1 text-xs font-medium text-orange-600">
-                          <Calendar className="h-3 w-3" />
-                          <span className="text-xs">Pending</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border border-gray-200 shadow-sm">
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                          <MessageSquare className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-gray-600">Replies Received</div>
-                          <div className="text-lg font-bold text-gray-900">{repliesReceivedCount}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-1 text-xs font-medium text-purple-600">
-                          <Eye className="h-3 w-3" />
-                          <span className="text-xs">{repliesReceivedCount > 0 ? `${Math.round((repliesReceivedCount / Math.max(emailsSentCount, 1)) * 100)}%` : '0%'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Email Usage Progress (Premium Users Only) */}
-              {isPremium && (
+            {/* Email Usage Progress */}
                 <div className="mb-6">
                   <EmailUsageProgress
                     usage={emailUsage}
@@ -1095,85 +525,75 @@ const EmailOutreach = () => {
                     compact={false}
                   />
                 </div>
-              )}
 
-              {/* Desktop Stats */}
-              <div className="hidden md:grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Total Contacts</p>
-                        <p className="text-2xl font-bold text-gray-900">{totalContactsCount}</p>
+            {/* Email Stats Dashboard */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <Card className="p-3 md:p-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="p-1.5 md:p-2 bg-blue-100 rounded-full flex-shrink-0">
+                    <Send className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
                       </div>
-                      <div className="bg-blue-100 p-3 rounded-full">
-                        <Users className="h-6 w-6 text-blue-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs md:text-sm text-gray-600 truncate">Emails Sent</p>
+                    <p className="text-lg md:text-2xl font-bold">
+                      <span className="text-xs md:text-base">{emailsSentCount}</span>
+                    </p>
                       </div>
                     </div>
-                  </CardContent>
                 </Card>
-                
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Emails Sent</p>
-                        <p className="text-2xl font-bold text-gray-900">{emailsSentCount}</p>
+              <Card className="p-3 md:p-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="p-1.5 md:p-2 bg-green-100 rounded-full flex-shrink-0">
+                    <MessageSquare className="h-3 w-3 md:h-4 md:w-4 text-green-600" />
                       </div>
-                      <div className="bg-green-100 p-3 rounded-full">
-                        <Mail className="h-6 w-6 text-green-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs md:text-sm text-gray-600 truncate">Replies</p>
+                    <p className="text-lg md:text-2xl font-bold">
+                      <span className="text-xs md:text-base">{repliesReceivedCount}</span>
+                    </p>
                       </div>
                     </div>
-                  </CardContent>
                 </Card>
-                
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Follow Ups Needed</p>
-                        <p className="text-2xl font-bold text-gray-900">{followupsNeededCount}</p>
+              <Card className="p-3 md:p-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="p-1.5 md:p-2 bg-yellow-100 rounded-full flex-shrink-0">
+                    <Calendar className="h-3 w-3 md:h-4 md:w-4 text-yellow-600" />
                       </div>
-                      <div className="bg-orange-100 p-3 rounded-full">
-                        <AlertCircle className="h-6 w-6 text-orange-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs md:text-sm text-gray-600 truncate">Follow-ups</p>
+                    <p className="text-lg md:text-2xl font-bold">
+                      <span className="text-xs md:text-base">{followupsNeededCount}</span>
+                    </p>
                       </div>
                     </div>
-                  </CardContent>
                 </Card>
-                
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Replies Received</p>
-                        <p className="text-2xl font-bold text-gray-900">{repliesReceivedCount}</p>
+              <Card className="p-3 md:p-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="p-1.5 md:p-2 bg-purple-100 rounded-full flex-shrink-0">
+                    <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-purple-600" />
                       </div>
-                      <div className="bg-purple-100 p-3 rounded-full">
-                        <CheckCircle className="h-6 w-6 text-purple-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs md:text-sm text-gray-600 truncate">Success Rate</p>
+                    <p className="text-lg md:text-2xl font-bold">
+                      <span className="text-xs">{repliesReceivedCount > 0 ? `${Math.round((repliesReceivedCount / Math.max(emailsSentCount, 1)) * 100)}%` : '0%'}</span>
+                    </p>
                       </div>
                     </div>
-                  </CardContent>
                 </Card>
               </div>
 
-              {/* Email Composer Section */}
-              <div className="space-y-4 md:space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
-                  <div>
-                    <h2 className="text-lg md:text-xl font-medium md:font-semibold text-gray-900">Email Composer</h2>
-                    <p className="text-xs md:text-sm text-gray-600 mt-0.5 md:mt-1">
-                      Showing contacts who haven't been emailed in the last 7 days
-                    </p>
-                  </div>
-                  
+            {/* Contact Management */}
+            <div className="space-y-3 md:space-y-4">
+              {/* Action Buttons */}
+              <div className="flex flex-col md:flex-row gap-2 md:gap-4">
                   {/* Mobile Action Button */}
                   <div className="md:hidden">
-                    <button
+                  <MobileButton
+                    className="w-full text-sm"
                       onClick={handleRefreshContacts}
                       disabled={isLoadingContacts}
-                      className="w-full px-3 py-2 text-xs font-medium rounded-md transition-colors border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                     >
-                      <div className="flex items-center justify-center gap-1.5">
+                    <div className="flex items-center justify-center gap-2">
                         {isLoadingContacts ? (
                           <>
                             <Loader2 className="h-3 w-3 animate-spin" />
@@ -1186,7 +606,7 @@ const EmailOutreach = () => {
                           </>
                         )}
                       </div>
-                    </button>
+                  </MobileButton>
                   </div>
                   
                   {/* Desktop Action Button */}
@@ -1197,31 +617,31 @@ const EmailOutreach = () => {
                     className="hidden md:flex items-center gap-2"
                   >
                     {isLoadingContacts ? (
+                    <>
                       <Loader2 className="h-4 w-4 animate-spin" />
+                      Refreshing...
+                    </>
                     ) : (
+                    <>
                       <RefreshCw className="h-4 w-4" />
+                      Refresh Contacts
+                    </>
                     )}
-                    Refresh
                   </Button>
                 </div>
                 
-                <AWSEmailComposer
-                  contacts={contacts.map(c => ({
-                    id: c.id,
-                    name: c.name,
-                    email: c.email,
-                    company: c.company,
-                    position: c.title,
-                    linkedin_link: c.linkedin_link
-                  }))}
+              {/* Contact List */}
+              <ContactList
+                contacts={contacts}
                   selectedContacts={selectedContacts}
                   onContactSelect={handleContactSelect}
                   onSelectAll={handleSelectAll}
                   onClearSelection={handleClearSelection}
+                onSendEmail={handleSendEmail}
+                loading={isLoadingContacts}
                 />
               </div>
             </div>
-          )}
         </div>
       </div>
 
@@ -1249,23 +669,38 @@ const EmailOutreach = () => {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Your Security is Our Priority
-              </h4>
-              <p className="text-sm text-blue-800">
-                Your Gmail password is never shared with us, 
-                and you can revoke access at any time through your Google Account settings.
+              <h4 className="font-semibold text-blue-900 mb-2">What we access:</h4>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• Your email address for authentication</li>
+                <li>• Send emails on your behalf when you explicitly compose and send them</li>
+                <li>• Read email responses to track job application replies</li>
+                <li>• Access your contacts to help you manage your outreach</li>
+              </ul>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <h4 className="font-semibold text-green-900 mb-2">How we protect your data:</h4>
+              <ul className="text-sm text-green-700 space-y-1">
+                <li>• All communications are encrypted</li>
+                <li>• We only access emails related to job applications</li>
+                <li>• Your credentials are stored securely using OAuth 2.0</li>
+                <li>• You can revoke access at any time</li>
+                <li>• We comply with Gmail's security standards</li>
+              </ul>
+            </div>
+
+            <div className="text-sm text-gray-600">
+              <p>
+                We use Gmail's official API with OAuth 2.0 authentication. This is the same secure method used by major applications like Slack, Trello, and other trusted services. You maintain full control and can revoke our access anytime through your Google Account settings.
               </p>
-              <p className="text-sm text-blue-800 mt-2">
-                For more details about how we handle your data, please read our{' '}
+              <p className="mt-2">
+                For complete details, please review our{' '}
                 <Link 
                   to="/privacy-policy" 
-                  className="underline hover:text-blue-900 font-medium"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                  onClick={() => setShowLearnMoreDialog(false)}
                 >
                   Privacy Policy
                 </Link>
@@ -1284,26 +719,6 @@ const EmailOutreach = () => {
                 <li>• We don't access your emails outside of job application tracking</li>
               </ul>
             </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h4 className="font-semibold text-green-900 mb-2 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" />
-                You're in Control
-              </h4>
-              <p className="text-sm text-green-800">
-                You can revoke our access at any time by visiting your{' '}
-                <a 
-                  href="https://myaccount.google.com/permissions" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="underline hover:text-green-900"
-                >
-                  Google Account permissions page
-                </a>
-                . Your job search data will remain in your HireBuddy account, but we won't be able to send emails 
-                on your behalf until you re-authenticate.
-              </p>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1314,8 +729,8 @@ const EmailOutreach = () => {
         onClose={() => setShowRenewalDialog(false)}
         emailUsage={emailUsage}
         onRenewalSuccess={() => {
+          setShowRenewalDialog(false);
           refreshUsage();
-          toast.success('Subscription renewed successfully!');
         }}
       />
     </div>

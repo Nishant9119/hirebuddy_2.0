@@ -698,12 +698,6 @@ const Jobs = () => {
                       <Star className="w-2.5 h-2.5 md:w-4 md:h-4" />
                       <span className="hidden sm:inline">Exclusive</span>
                       <span className="sm:hidden">Exc</span>
-                      {isPremium && (
-                        <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs hidden md:inline-flex">
-                          <Crown className="w-3 h-3 mr-1" />
-                          Premium
-                        </Badge>
-                      )}
                       <Badge variant="secondary" className="ml-0.5 md:ml-1 mobile-body-xs px-1">
                         {getTabCount('exclusive')}
                       </Badge>
@@ -730,85 +724,8 @@ const Jobs = () => {
                   ) : null;
                 })()}
 
-                {/* Premium Restriction for Exclusive Jobs */}
-                {activeTab === 'exclusive' && !isPremium && !premiumLoading && (
-                  <div className="relative">
-                    {/* Blurred Content */}
-                    <div className="filter blur-sm pointer-events-none">
-                      <div className="space-y-4">
-                        {Array.from({ length: 3 }).map((_, i) => (
-                          <Card key={i} className="p-6">
-                            <div className="flex items-start gap-4">
-                              <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-                                <Star className="w-8 h-8 text-white" />
-                              </div>
-                              <div className="flex-1 space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <h3 className="text-lg font-semibold text-gray-900">
-                                    Senior Software Engineer - Exclusive
-                                  </h3>
-                                  <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
-                                    <Crown className="w-3 h-3 mr-1" />
-                                    Premium
-                                  </Badge>
-                                </div>
-                                <p className="text-gray-600 font-medium">TechCorp Inc.</p>
-                                <div className="flex items-center gap-4 text-sm text-gray-500">
-                                  <span>San Francisco, CA</span>
-                                  <span>2 days ago</span>
-                                  <span>Full-time</span>
-                                </div>
-                                <p className="text-gray-600">
-                                  Join our exclusive network of premium opportunities...
-                                </p>
-                                <div className="flex gap-2">
-                                  <Badge variant="secondary">React</Badge>
-                                  <Badge variant="secondary">TypeScript</Badge>
-                                  <Badge variant="secondary">Node.js</Badge>
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Premium Upgrade Overlay */}
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
-                      <div className="text-center p-8 max-w-md">
-                        <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Lock className="w-10 h-10 text-white" />
-                        </div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                          Unlock Exclusive Jobs
-                        </h3>
-                        <p className="text-gray-600 mb-6">
-                          Access premium job opportunities from top companies. Get priority placement and exclusive roles not available to regular users.
-                        </p>
-                        <div className="space-y-3">
-                          <a 
-                            href="https://payments.cashfree.com/forms/hirebuddy_premium_subscription" 
-                            target="_parent"
-                            className="block w-full"
-                            style={{ textDecoration: 'none' }}
-                          >
-                            <Button className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-semibold py-3">
-                              <Crown className="w-5 h-5 mr-2" />
-                              Upgrade to Premium
-                            </Button>
-                          </a>
-                          <p className="text-sm text-gray-500">
-                            Join thousands of professionals who found their dream jobs
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Regular Jobs List */}
-                {!(activeTab === 'exclusive' && !isPremium) && (
-                  <>
+                {/* Jobs List - Available to All Users */}
+                <>
                     {isLoading ? (
                       <div className="space-y-4">
                         {Array.from({ length: 5 }).map((_, i) => (
@@ -1038,8 +955,7 @@ const Jobs = () => {
                           )}
                         </>
                       )}
-                    </>
-                  )}
+                </>
               </div>
             </div>
 
