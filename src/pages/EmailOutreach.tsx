@@ -365,14 +365,12 @@ const EmailOutreach = () => {
       return;
     }
 
-    // Check email limits before sending (only for premium users)
-    if (isPremium) {
-      const canSendResult = await checkCanSendEmails(selectedContacts.length);
-      if (!canSendResult.canSend) {
-        toast.error(canSendResult.message || 'Email limit exceeded');
-        setShowRenewalDialog(true);
-        return;
-      }
+    // Check email limits before sending
+    const canSendResult = await checkCanSendEmails(selectedContacts.length);
+    if (!canSendResult.canSend) {
+      toast.error(canSendResult.message || 'Email limit exceeded');
+      setShowRenewalDialog(true);
+      return;
     }
 
     setIsSending(true);
@@ -460,13 +458,11 @@ const EmailOutreach = () => {
           `Successfully sent ${successCount} email${successCount !== 1 ? 's' : ''}`
         );
         
-        // Update email count for premium users
-        if (isPremium) {
-          try {
-            await incrementEmailCount(successCount);
-          } catch (error) {
-            console.error('Failed to update email count:', error);
-          }
+        // Update email count
+        try {
+          await incrementEmailCount(successCount);
+        } catch (error) {
+          console.error('Failed to update email count:', error);
         }
       }
       
@@ -547,168 +543,8 @@ const EmailOutreach = () => {
 
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
-          {/* Premium Restriction Overlay */}
-          {!isPremium && !premiumLoading && (
-            <div className="relative h-full">
-              {/* Blurred Content */}
-              <div className="filter blur-sm pointer-events-none">
-                <div className="p-6 space-y-6">
-                  {/* Mock Gmail Authentication Section */}
-                  <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-blue-100 p-2 rounded-full">
-                            <Shield className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-blue-900">Premium Email Outreach</h3>
-                            <p className="text-sm text-blue-700">
-                              Connect with recruiters and hiring managers
-                            </p>
-                          </div>
-                        </div>
-                        <Badge className="bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-yellow-900 border-yellow-300">
-                          <Crown className="w-3 h-3 mr-1" />
-                          Premium
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Mock Stats Dashboard */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Total Contacts</p>
-                            <p className="text-2xl font-bold text-gray-900">{totalContactsCount}</p>
-                          </div>
-                          <div className="bg-blue-100 p-3 rounded-full">
-                            <Users className="h-6 w-6 text-blue-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Emails Sent</p>
-                            <p className="text-2xl font-bold text-gray-900">89</p>
-                          </div>
-                          <div className="bg-green-100 p-3 rounded-full">
-                            <Mail className="h-6 w-6 text-green-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Response Rate</p>
-                            <p className="text-2xl font-bold text-gray-900">23%</p>
-                          </div>
-                          <div className="bg-orange-100 p-3 rounded-full">
-                            <AlertCircle className="h-6 w-6 text-orange-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Interviews</p>
-                            <p className="text-2xl font-bold text-gray-900">12</p>
-                          </div>
-                          <div className="bg-purple-100 p-3 rounded-full">
-                            <CheckCircle className="h-6 w-6 text-purple-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Mock Email Composer */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Premium Email Composer</CardTitle>
-                      <CardDescription>
-                        Advanced email templates and AI-powered personalization
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="bg-gray-100 rounded-lg p-4 h-32"></div>
-                        <div className="flex gap-2">
-                          <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-                            <Send className="w-4 h-4 mr-2" />
-                            Send Campaign
-                          </Button>
-                          <Button variant="outline">Schedule</Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              {/* Premium Upgrade Overlay */}
-              <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center p-6">
-                <div className="text-center max-w-lg">
-                  <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Lock className="w-12 h-12 text-white" />
-                  </div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                    Premium Email Outreach
-                  </h2>
-                  <p className="text-lg text-gray-600 mb-6">
-                    Unlock powerful email outreach tools to connect with recruiters and hiring managers. 
-                    Send personalized campaigns, track responses, and land more interviews.
-                  </p>
-                  
-                  <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                    <h3 className="font-semibold text-yellow-800 mb-2">Premium Features Include:</h3>
-                    <ul className="text-sm text-yellow-700 space-y-1">
-                      <li>• Unlimited email campaigns</li>
-                      <li>• AI-powered email templates</li>
-                      <li>• Advanced analytics and tracking</li>
-                      <li>• Gmail integration</li>
-                      <li>• Response management</li>
-                      <li>• Follow-up automation</li>
-                    </ul>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <a 
-                      href="https://payments.cashfree.com/forms/hirebuddy_premium_subscription" 
-                      target="_parent"
-                      className="block w-full"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <Button className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-semibold py-3 text-lg">
-                        <Crown className="w-5 h-5 mr-2" />
-                        Upgrade to Premium
-                      </Button>
-                    </a>
-                    <p className="text-sm text-gray-500">
-                      Join thousands of professionals who accelerated their job search
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Regular Content for Premium Users */}
-          {isPremium && (
-            <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+          {/* Regular Content for All Users */}
+          <div className="p-4 md:p-6 space-y-4 md:space-y-6">
               {/* Re-authentication Section */}
               <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
                 <CardContent className="p-3 md:p-4">
@@ -1085,17 +921,15 @@ const EmailOutreach = () => {
                 </Card>
               </div>
 
-              {/* Email Usage Progress (Premium Users Only) */}
-              {isPremium && (
-                <div className="mb-6">
-                  <EmailUsageProgress
-                    usage={emailUsage}
-                    loading={emailUsageLoading}
-                    onRenewClick={() => setShowRenewalDialog(true)}
-                    compact={false}
-                  />
-                </div>
-              )}
+              {/* Email Usage Progress */}
+              <div className="mb-6">
+                <EmailUsageProgress
+                  usage={emailUsage}
+                  loading={emailUsageLoading}
+                  onRenewClick={() => setShowRenewalDialog(true)}
+                  compact={false}
+                />
+              </div>
 
               {/* Desktop Stats */}
               <div className="hidden md:grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1221,7 +1055,6 @@ const EmailOutreach = () => {
                 />
               </div>
             </div>
-          )}
         </div>
       </div>
 
