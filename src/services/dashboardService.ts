@@ -274,6 +274,62 @@ export class DashboardService {
     }
   }
 
+  /**
+   * Get emails sent count
+   */
+  static async getEmailsSentCount(): Promise<number> {
+    try {
+      const stats = await this.getEmailOutreachStats();
+      return stats.total_emails_sent;
+    } catch (error) {
+      console.error('Error fetching emails sent count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get followups needed count
+   */
+  static async getFollowupsNeededCount(): Promise<number> {
+    try {
+      // This would typically come from a backend API
+      // For now, return a sample value
+      return 5;
+    } catch (error) {
+      console.error('Error fetching followups needed count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get replies received count
+   */
+  static async getRepliesReceivedCount(): Promise<number> {
+    try {
+      // This would typically come from a backend API
+      // For now, return a sample value based on response rate
+      const stats = await this.getEmailOutreachStats();
+      return Math.round((stats.response_rate / 100) * stats.total_emails_sent);
+    } catch (error) {
+      console.error('Error fetching replies received count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get total contacts count
+   */
+  static async getTotalContactsCount(): Promise<number> {
+    try {
+      // This would typically come from a backend API
+      // For now, return a sample value
+      return 25;
+    } catch (error) {
+      console.error('Error fetching total contacts count:', error);
+      return 0;
+    }
+  }
+
   // Helper methods
   private static extractSkillsFromJob(job: any): string[] {
     const description = (job.job_description || '').toLowerCase();
