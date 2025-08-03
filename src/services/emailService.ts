@@ -1,6 +1,5 @@
 import { EnvironmentValidator, SecureErrorHandler, InputValidator, InputSanitizer } from '../utils/security';
 import { supabase } from '@/lib/supabase';
-import { getConfig } from '@/config/environment';
 
 export interface EmailSendRequest {
   sender: string;
@@ -104,7 +103,7 @@ class EmailService {
     // Use secure environment variable access
     try {
       this.apiBaseUrl = EnvironmentValidator.getSecureEnvVar('VITE_AWS_API_BASE_URL');
-      this.openaiProxyUrl = `${getConfig().supabase.url}/functions/v1/openai-proxy`;
+      this.openaiProxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-proxy`;
     } catch (error) {
       throw SecureErrorHandler.createSafeError(
         error,
@@ -467,7 +466,7 @@ class EmailService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': getConfig().supabase.anonKey
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
@@ -516,7 +515,7 @@ class EmailService {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
-            'apikey': getConfig().supabase.anonKey
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
           },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
