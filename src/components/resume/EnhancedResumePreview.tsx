@@ -179,7 +179,7 @@ export const EnhancedResumePreview: React.FC<EnhancedResumePreviewProps> = ({
       case 'Georgia':
         return 'Georgia, serif';
       default:
-        return 'Inter, sans-serif';
+        return 'Times New Roman, serif';
     }
   };
 
@@ -827,82 +827,88 @@ export const EnhancedResumePreview: React.FC<EnhancedResumePreviewProps> = ({
         {/* Add CSS for better page break handling */}
         <style dangerouslySetInnerHTML={{
           __html: `
-                         @media print {
-               .resume-section {
-                 page-break-inside: avoid;
-                 break-inside: avoid;
-               }
-               
-               .experience-item,
-               .education-item,
-               .project-item,
-               .certification-item {
-                 page-break-inside: avoid;
-                 break-inside: avoid;
-                 margin-bottom: 16px;
-               }
-               
-               h1, h2, h3, h4, h5, h6 {
-                 page-break-after: avoid;
-                 break-after: avoid;
-                 page-break-inside: avoid;
-                 break-inside: avoid;
-               }
-               
-               /* Ensure second page content starts with proper margin */
-               @page:first {
-                 margin-top: 15mm;
-               }
-               
-               @page {
-                 margin-top: 15mm;
-                 margin-bottom: 15mm;
-                 margin-left: 15mm;
-                 margin-right: 15mm;
-               }
-               
-               /* Add top border line for subsequent pages */
-               @page:not(:first) {
-                 border-top: 0.5pt solid black;
-                 margin-top: 17mm; /* Slightly more margin to accommodate border */
-               }
-             }
+            /* Ensure Times New Roman is applied to all text elements */
+            #resume-content,
+            #resume-content * {
+              font-family: ${getFontFamily()} !important;
+            }
             
-                         /* For PDF generation - ensure proper spacing */
-             .page-break-before {
-               page-break-before: always;
-               break-before: page;
-             }
-             
-             .avoid-page-break {
-               page-break-inside: avoid;
-               break-inside: avoid;
-             }
-             
-             /* Simulate page break with top border for preview */
-             .page-break-with-border {
-               page-break-before: always;
-               break-before: page;
-               border-top: 1px solid #000;
-               padding-top: 15mm;
-               margin-top: 15mm;
-             }
-             
-             /* Visual indicator for second page content in preview */
-             .second-page-content {
-               position: relative;
-             }
-             
-             .second-page-content::before {
-               content: '';
-               position: absolute;
-               top: -17mm;
-               left: 0;
-               right: 0;
-               height: 1px;
-               background-color: #000;
-               opacity: 0.3;
-             }
+            @media print {
+              .resume-section {
+                page-break-inside: avoid;
+                break-inside: avoid;
+              }
+              
+              .experience-item,
+              .education-item,
+              .project-item,
+              .certification-item {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin-bottom: 16px;
+              }
+              
+              h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
+                break-after: avoid;
+                page-break-inside: avoid;
+                break-inside: avoid;
+              }
+              
+              /* Ensure second page content starts with proper margin */
+              @page:first {
+                margin-top: 15mm;
+              }
+              
+              @page {
+                margin-top: 15mm;
+                margin-bottom: 15mm;
+                margin-left: 15mm;
+                margin-right: 15mm;
+              }
+              
+              /* Add top border line for subsequent pages */
+              @page:not(:first) {
+                border-top: 0.5pt solid black;
+                margin-top: 17mm; /* Slightly more margin to accommodate border */
+              }
+            }
+            
+            /* For PDF generation - ensure proper spacing */
+            .page-break-before {
+              page-break-before: always;
+              break-before: page;
+            }
+            
+            .avoid-page-break {
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+            
+            /* Simulate page break with top border for preview */
+            .page-break-with-border {
+              page-break-before: always;
+              break-before: page;
+              border-top: 1px solid #000;
+              padding-top: 15mm;
+              margin-top: 15mm;
+            }
+            
+            /* Visual indicator for second page content in preview */
+            .second-page-content {
+              position: relative;
+            }
+            
+            .second-page-content::before {
+              content: '';
+              position: absolute;
+              top: -17mm;
+              left: 0;
+              right: 0;
+              height: 1px;
+              background-color: #000;
+              opacity: 0.3;
+            }
           `
         }} />
         

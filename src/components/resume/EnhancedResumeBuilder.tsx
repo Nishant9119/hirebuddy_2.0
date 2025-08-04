@@ -233,7 +233,7 @@ export const EnhancedResumeBuilder: React.FC<EnhancedResumeBuilderProps> = ({
   const [settings, setSettings] = useState<Settings>({
     template: 'perfect-fit',
     fontSize: 11,
-    fontFamily: 'Inter',
+    fontFamily: 'Times New Roman',
     colorScheme: 'pink',
     spacing: 'normal',
     showPhoto: false,
@@ -1176,7 +1176,7 @@ export const EnhancedResumeBuilder: React.FC<EnhancedResumeBuilderProps> = ({
                                  settings.fontFamily === 'Lato' ? 'Lato, sans-serif' :
                                  settings.fontFamily === 'Arial' ? 'Arial, sans-serif' :
                                  settings.fontFamily === 'Times New Roman' ? '"Times New Roman", serif' :
-                                 settings.fontFamily === 'Georgia' ? 'Georgia, serif' : 'Inter, sans-serif',
+                                 settings.fontFamily === 'Georgia' ? 'Georgia, serif' : '"Times New Roman", serif',
                       fontSize: `${settings.fontSize}pt`,
                       lineHeight: settings.spacing === 'compact' ? 1.3 : settings.spacing === 'relaxed' ? 1.6 : 1.4
                     }}
@@ -1338,7 +1338,7 @@ export const EnhancedResumeBuilder: React.FC<EnhancedResumeBuilderProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => updateSettings({
-                      fontFamily: 'Inter',
+                      fontFamily: 'Times New Roman',
                       fontSize: 10,
                       spacing: 'compact',
                       colorScheme: 'indigo',
