@@ -33,7 +33,9 @@ additional_redirect_urls = [
   "http://localhost:8080/auth/google/callback", 
   "https://localhost:8080/auth/google/callback",
   "https://hirebuddy.net",
-  "https://hirebuddy.net/auth/google/callback"
+  "https://hirebuddy.net/auth/google/callback",
+  "https://www.hirebuddy.net",
+  "https://www.hirebuddy.net/auth/google/callback"
 ]
 jwt_expiry = 3600
 enable_signup = true

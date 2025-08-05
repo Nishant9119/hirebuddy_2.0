@@ -11,8 +11,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+  'Access-Control-Max-Age': '86400',
 }
 
 interface TokenExchangeRequest {
@@ -26,8 +27,12 @@ interface TokenRefreshRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  console.log('Google Auth Proxy called with method:', req.method);
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
+    console.log('Handling CORS preflight request');
     return new Response(null, { 
       status: 200,
       headers: corsHeaders 
@@ -35,6 +40,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   if (req.method !== "POST") {
+    console.log('Method not allowed:', req.method);
     return new Response(
       JSON.stringify({ error: "Method not allowed" }), 
       { 
@@ -48,6 +54,8 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log('Processing POST request');
+    
     // Verify authentication
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -56,31 +64,39 @@ const handler = async (req: Request): Promise<Response> => {
 
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) {
+      console.error('No authorization header provided');
       throw new Error("No authorization header")
     }
 
     const token = authHeader.replace("Bearer ", "")
-    const { data: { user } } = await supabaseClient.auth.getUser(token)
+    console.log('Verifying user token...');
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
     
-    if (!user) {
+    if (authError || !user) {
+      console.error('Authentication error:', authError);
       throw new Error("Unauthorized")
     }
+
+    console.log('User authenticated:', user.email);
 
     // Get Google OAuth credentials from environment
     const clientId = Deno.env.get("GOOGLE_CLIENT_ID")
     const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")
     
     if (!clientId || !clientSecret) {
+      console.error('Google OAuth credentials not configured');
       throw new Error("Google OAuth credentials not configured")
     }
 
     // Parse request body
     const requestBody: TokenExchangeRequest | TokenRefreshRequest = await req.json()
+    console.log('Request body type:', 'code' in requestBody ? 'token exchange' : 'token refresh');
 
     let tokenResponse: Response
 
     if ('code' in requestBody) {
       // Handle authorization code exchange
+      console.log('Exchanging authorization code for tokens...');
       tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -96,6 +112,7 @@ const handler = async (req: Request): Promise<Response> => {
       })
     } else if ('refresh_token' in requestBody) {
       // Handle token refresh
+      console.log('Refreshing access token...');
       tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -119,6 +136,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const tokens = await tokenResponse.json()
+    console.log('Successfully received tokens from Google');
 
     return new Response(
       JSON.stringify(tokens),
