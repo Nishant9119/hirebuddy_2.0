@@ -50,6 +50,7 @@ class GoogleAuthService {
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', this.scope);
     authUrl.searchParams.set('access_type', 'offline');
+    authUrl.searchParams.set('state', 'email_outreach'); // Add state parameter for security
     
     // Force consent screen for reauthentication or first-time auth
     if (forceReauth) {
@@ -71,6 +72,8 @@ class GoogleAuthService {
   // Handle OAuth callback and exchange code for tokens
   async handleCallback(code: string): Promise<GoogleUser | null> {
     try {
+      console.log('Handling Google OAuth callback...');
+      
       // Use Supabase Edge Function for secure token exchange
       const { data, error } = await supabase.functions.invoke('google-auth-proxy', {
         body: {
@@ -86,8 +89,11 @@ class GoogleAuthService {
 
       const tokenData = data;
       if (!tokenData.access_token) {
+        console.error('No access token received from Google');
         throw new Error('No access token received');
       }
+      
+      console.log('Successfully received tokens from Google');
       
       // Get user info from Google
       const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -97,10 +103,12 @@ class GoogleAuthService {
       });
 
       if (!userInfoResponse.ok) {
+        console.error('Failed to get user info from Google');
         throw new Error('Failed to get user info');
       }
 
       const userInfo = await userInfoResponse.json();
+      console.log('Retrieved user info:', userInfo.email);
       
       // Store user info and tokens in Supabase
       const googleUser = await this.storeUserTokens({
@@ -112,6 +120,7 @@ class GoogleAuthService {
         refresh_token: tokenData.refresh_token,
       });
 
+      console.log('Successfully stored user tokens');
       return googleUser;
     } catch (error) {
       console.error('Error handling Google OAuth callback:', error);
@@ -155,53 +164,67 @@ class GoogleAuthService {
 
   // Get stored user by current session and validate tokens
   async getStoredUser(): Promise<GoogleUser | null> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        console.log('No active session found');
+        return null;
+      }
 
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', session.user.email)
-      .single();
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', session.user.email)
+        .single();
 
-    if (error || !data) return null;
+      if (error || !data) {
+        console.log('No stored Google user found for email:', session.user.email);
+        return null;
+      }
 
-    // Validate that user has both access_token and refresh_token
-    if (!data.access_token) {
-      console.log('User found but no access token');
-      return null;
-    }
+      // Validate that user has both access_token and refresh_token
+      if (!data.access_token) {
+        console.log('User found but no access token');
+        return null;
+      }
 
-    // Test if the access token is still valid
-    const isValid = await this.validateAccessToken(data.access_token);
-    if (isValid) {
-      return data;
-    }
+      // Test if the access token is still valid
+      const isValid = await this.validateAccessToken(data.access_token);
+      if (isValid) {
+        console.log('Access token is valid');
+        return data;
+      }
 
-    // If access token is invalid, try to refresh it
-    if (data.refresh_token) {
-      const newAccessToken = await this.refreshAccessToken(data.refresh_token);
-      if (newAccessToken) {
-        // Update the access token in database
-        const { data: updatedData, error: updateError } = await supabase
-          .from('users')
-          .update({ 
-            access_token: newAccessToken,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', data.id)
-          .select()
-          .single();
+      // If access token is invalid, try to refresh it
+      if (data.refresh_token) {
+        console.log('Access token expired, attempting to refresh...');
+        const newAccessToken = await this.refreshAccessToken(data.refresh_token);
+        if (newAccessToken) {
+          // Update the access token in database
+          const { data: updatedData, error: updateError } = await supabase
+            .from('users')
+            .update({ 
+              access_token: newAccessToken,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', data.id)
+            .select()
+            .single();
 
-        if (!updateError && updatedData) {
-          return updatedData;
+          if (!updateError && updatedData) {
+            console.log('Successfully refreshed access token');
+            return updatedData;
+          }
         }
       }
-    }
 
-    // If we can't refresh the token, the user needs to re-authenticate
-    console.log('Unable to refresh token, user needs to re-authenticate');
-    return null;
+      // If we can't refresh the token, the user needs to re-authenticate
+      console.log('Unable to refresh token, user needs to re-authenticate');
+      return null;
+    } catch (error) {
+      console.error('Error in getStoredUser:', error);
+      return null;
+    }
   }
 
   // Validate access token by making a test API call

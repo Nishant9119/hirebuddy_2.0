@@ -124,9 +124,10 @@ const EmailOutreach = () => {
     setHasAttemptedAuth(true);
     try {
       await googleAuthService.initiateAuth();
+      // Note: The page will redirect to Google OAuth, so we don't need to handle the response here
     } catch (error) {
       console.error('Error initiating Google auth:', error);
-      toast.error('Failed to initiate Gmail authentication');
+      toast.error('Failed to initiate Gmail authentication. Please try again.');
       setIsGoogleAuthenticating(false);
     }
   };
@@ -149,7 +150,11 @@ const EmailOutreach = () => {
 
   // Check authentication status and refresh if needed
   const checkAuthStatus = async () => {
-    if (!googleUser) return;
+    if (!googleUser) {
+      toast.warning('No Gmail authentication found. Please connect your Gmail account.');
+      setShowAuthOptions(true);
+      return;
+    }
     
     try {
       setIsGoogleAuthenticating(true);
@@ -157,15 +162,17 @@ const EmailOutreach = () => {
       
       if (refreshedUser) {
         setGoogleUser(refreshedUser);
-        toast.success('Authentication verified');
+        toast.success('Gmail authentication verified successfully!');
       } else {
         setGoogleUser(null);
-        toast.warning('Authentication expired. Please re-authenticate.');
+        toast.warning('Gmail authentication expired. Please re-authenticate.');
         setShowAuthOptions(true);
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
-      toast.error('Error checking authentication status');
+      toast.error('Error checking authentication status. Please try re-authenticating.');
+      setGoogleUser(null);
+      setShowAuthOptions(true);
     } finally {
       setIsGoogleAuthenticating(false);
     }
@@ -180,14 +187,14 @@ const EmailOutreach = () => {
       if (googleUser) {
         await googleAuthService.clearStoredAuth();
         setGoogleUser(null);
-        toast.info('Previous authentication cleared');
+        toast.info('Previous Gmail authentication cleared');
       }
       
       // Start fresh authentication with force reauth flag
       await googleAuthService.initiateAuth(true);
     } catch (error) {
       console.error('Error during forced reauthentication:', error);
-      toast.error('Failed to initiate reauthentication');
+      toast.error('Failed to initiate reauthentication. Please try again.');
       setIsGoogleAuthenticating(false);
     }
   };
@@ -283,16 +290,33 @@ const EmailOutreach = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const state = urlParams.get('state');
+    const authenticated = urlParams.get('authenticated');
+    
+    // Handle successful authentication redirect
+    if (authenticated === 'true') {
+      // Check if we have a stored user
+      const storedUser = await googleAuthService.getStoredUser();
+      if (storedUser) {
+        setGoogleUser(storedUser);
+        toast.success('Gmail authentication successful!');
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      return;
+    }
     
     if (code && state === 'email_outreach') {
       setIsGoogleAuthenticating(true);
       
       try {
         const user = await googleAuthService.handleCallback(code);
-        handleAuthSuccess(user);
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        if (user) {
+          handleAuthSuccess(user);
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+          toast.error('Failed to complete authentication');
+        }
       } catch (error) {
         console.error('Error handling OAuth callback:', error);
         toast.error('Failed to complete authentication');
