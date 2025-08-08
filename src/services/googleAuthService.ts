@@ -30,7 +30,8 @@ class GoogleAuthService {
 
   constructor() {
     this.clientId = getConfig().google.clientId;
-    this.redirectUri = `${window.location.origin}/auth/google/callback`;
+    const origin = typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || '';
+    this.redirectUri = `${origin}/auth/google/callback`;
     this.scope = [
       'https://www.googleapis.com/auth/gmail.send',
       'https://www.googleapis.com/auth/gmail.readonly',
@@ -42,6 +43,7 @@ class GoogleAuthService {
 
   // Initialize Google OAuth flow
   async initiateAuth(forceReauth: boolean = false): Promise<void> {
+    if (typeof window === 'undefined') return;
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     authUrl.searchParams.set('client_id', this.clientId);
     authUrl.searchParams.set('redirect_uri', this.redirectUri);
@@ -61,7 +63,9 @@ class GoogleAuthService {
     // Store current user session for later reference
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      localStorage.setItem('pending_google_auth_user', session.user.id);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('pending_google_auth_user', session.user.id);
+      }
     }
     
     window.location.href = authUrl.toString();

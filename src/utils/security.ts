@@ -5,10 +5,10 @@
 // Environment variable validation
 export class EnvironmentValidator {
   private static requiredVars = [
-    'VITE_SUPABASE_URL',
-    'VITE_SUPABASE_ANON_KEY',
-    'VITE_AWS_API_BASE_URL',
-    'VITE_GOOGLE_CLIENT_ID'
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_AWS_API_BASE_URL',
+    'NEXT_PUBLIC_GOOGLE_CLIENT_ID'
   ];
 
   // Sensitive variables that should NEVER have VITE_ prefix
@@ -26,21 +26,21 @@ export class EnvironmentValidator {
     
     // Check for required variables
     this.requiredVars.forEach(varName => {
-      if (!import.meta.env[varName]) {
+      if (!process.env[varName]) {
         missingVars.push(varName);
       }
     });
 
     // Check for exposed secrets
     this.forbiddenViteVars.forEach(varName => {
-      if (import.meta.env[varName]) {
+      if (process.env[varName]) {
         exposedSecrets.push(varName);
         console.error(`🚨 SECURITY RISK: ${varName} is exposed to the client! Remove VITE_ prefix and move to server-side.`);
       }
     });
 
     // Log security warnings in development
-    if (import.meta.env.DEV && exposedSecrets.length > 0) {
+    if (process.env.NODE_ENV !== 'production' && exposedSecrets.length > 0) {
       console.warn(`
 🔒 SECURITY WARNING: The following sensitive variables are exposed to the client:
 ${exposedSecrets.map(v => `- ${v}`).join('\n')}
@@ -58,7 +58,8 @@ Client-side code should use Supabase Edge Functions for secure API calls.
   }
 
   static getSecureEnvVar(key: string): string {
-    const value = import.meta.env[key];
+    const altKey = key.startsWith('VITE_') ? `NEXT_PUBLIC_${key.slice(5)}` : key;
+    const value = (process.env[key] || process.env[altKey]) as string | undefined;
     if (!value) {
       throw new Error(`Required environment variable ${key} is not configured`);
     }
@@ -66,6 +67,7 @@ Client-side code should use Supabase Edge Functions for secure API calls.
   }
 
   static logEnvironmentStatus(): void {
+    if (typeof window === 'undefined') return; // avoid noisy logs during SSR
     console.log('🔍 Environment Security Check:');
     const { isValid, missingVars, exposedSecrets } = this.validateEnvironment();
     

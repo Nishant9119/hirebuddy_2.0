@@ -1,4 +1,5 @@
 import { EnvironmentValidator, SecureErrorHandler, InputValidator, InputSanitizer } from '../utils/security';
+import { getConfig } from '@/config/environment';
 import { supabase } from '@/lib/supabase';
 
 export interface EmailSendRequest {
@@ -100,16 +101,11 @@ class EmailService {
   private useHtmlEmails: boolean = true; // Enable HTML emails for proper formatting and line spacing
 
   constructor() {
-    // Use secure environment variable access
-    try {
-      this.apiBaseUrl = EnvironmentValidator.getSecureEnvVar('VITE_AWS_API_BASE_URL');
-      this.openaiProxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-proxy`;
-    } catch (error) {
-      throw SecureErrorHandler.createSafeError(
-        error,
-        'Email service configuration error. Please check your environment variables.'
-      );
-    }
+    // Resolve API base URL from config with safe fallbacks; do not hard-throw on load
+    const cfg = getConfig();
+    this.apiBaseUrl = cfg.api.awsBaseUrl || cfg.api.baseUrl;
+    const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '') as string;
+    this.openaiProxyUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/openai-proxy` : '';
   }
 
   /**
@@ -466,7 +462,7 @@ class EmailService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+          'apikey': (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '') as string
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
@@ -515,7 +511,7 @@ class EmailService {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+            'apikey': (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '') as string
           },
         body: JSON.stringify({
           model: 'gpt-4o-mini',

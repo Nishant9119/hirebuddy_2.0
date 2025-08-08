@@ -29,30 +29,30 @@ interface PublicConfig {
 // NO sensitive keys should be here
 export const config: PublicConfig = {
   supabase: {
-    url: import.meta.env.VITE_SUPABASE_URL || '',
-    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+    url: (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '') as string,
+    anonKey: (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '') as string,
   },
   google: {
-    clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+    clientId: (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '') as string,
   },
   api: {
-    baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3001',
-    awsBaseUrl: import.meta.env.VITE_AWS_API_BASE_URL || '',
+    baseUrl: (process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || 'http://localhost:3001') as string,
+    awsBaseUrl: (process.env.NEXT_PUBLIC_AWS_API_BASE_URL || process.env.VITE_AWS_API_BASE_URL || '') as string,
   },
   stack: {
-    publishableKey: import.meta.env.VITE_STACK_PUBLISHABLE_KEY || '',
+    publishableKey: (process.env.NEXT_PUBLIC_STACK_PUBLISHABLE_KEY || process.env.VITE_STACK_PUBLISHABLE_KEY || '') as string,
   },
-  isDevelopment: import.meta.env.MODE === 'development',
-  isProduction: import.meta.env.PROD,
+  isDevelopment: process.env.NODE_ENV === 'development',
+  isProduction: process.env.NODE_ENV === 'production',
 };
 
 // Validation helper to ensure required public configs are present
 export function validatePublicConfig(): { isValid: boolean; missingVars: string[] } {
   const missingVars: string[] = [];
   
-  if (!config.supabase.url) missingVars.push('VITE_SUPABASE_URL');
-  if (!config.supabase.anonKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
-  if (!config.google.clientId) missingVars.push('VITE_GOOGLE_CLIENT_ID');
+  if (!config.supabase.url) missingVars.push('NEXT_PUBLIC_SUPABASE_URL');
+  if (!config.supabase.anonKey) missingVars.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  if (!config.google.clientId) missingVars.push('NEXT_PUBLIC_GOOGLE_CLIENT_ID');
   
   return {
     isValid: missingVars.length === 0,
@@ -64,9 +64,9 @@ export function validatePublicConfig(): { isValid: boolean; missingVars: string[
 export function getConfig(): PublicConfig {
   const validation = validatePublicConfig();
   
+  // Log but do not throw; individual services already handle missing values gracefully
   if (!validation.isValid) {
     console.error('Missing required environment variables:', validation.missingVars);
-    throw new Error(`Missing required environment variables: ${validation.missingVars.join(', ')}`);
   }
   
   return config;
