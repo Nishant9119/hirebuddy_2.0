@@ -48,7 +48,7 @@ class GoogleAuthService {
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', this.scope);
     authUrl.searchParams.set('access_type', 'offline');
-    authUrl.searchParams.set('state', 'email_outreach'); // Add state parameter for security
+    authUrl.searchParams.set('state', 'email_outreach'); 
     
     // Force consent screen for reauthentication or first-time auth
     if (forceReauth) {
