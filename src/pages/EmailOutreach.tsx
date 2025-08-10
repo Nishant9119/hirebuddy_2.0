@@ -266,15 +266,20 @@ const EmailOutreach = () => {
     }
   };
 
-  // Load email stats
+  // Load email stats from live database
   const loadEmailStats = async () => {
     try {
-      const emailStats = await DashboardService.getEmailOutreachStats();
-      
+      const [emailStats, followups, replies, totalContacts] = await Promise.all([
+        DashboardService.getEmailOutreachStats(),
+        DashboardService.getFollowupsNeededCount(),
+        DashboardService.getRepliesReceivedCount(),
+        DashboardService.getTotalContactsCount(),
+      ]);
+
       setEmailsSentCount(emailStats.total_emails_sent);
-      setFollowupsNeededCount(0); // This would need a separate implementation
-      setRepliesReceivedCount(Math.floor(emailStats.total_emails_sent * emailStats.response_rate / 100));
-      setTotalContactsCount(contacts.length);
+      setFollowupsNeededCount(followups);
+      setRepliesReceivedCount(replies);
+      setTotalContactsCount(totalContacts);
     } catch (error) {
       console.error('Error loading email stats:', error);
       // Set default values on error

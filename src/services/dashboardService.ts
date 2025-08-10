@@ -312,13 +312,14 @@ export class DashboardService {
         };
       }
 
-      const userId = currentUser.id;
+      // Our useremaillog table uses user email as user_id
+      const userIdentifier = currentUser.email || currentUser.id;
 
       // Total emails sent
       const { count: totalSent } = await supabase
         .from('useremaillog')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
+        .eq('user_id', userIdentifier);
 
       // Emails sent this month
       const startOfMonth = new Date();
@@ -328,7 +329,7 @@ export class DashboardService {
       const { count: thisMonth } = await supabase
         .from('useremaillog')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
+        .eq('user_id', userIdentifier)
         .gte('sent_at', startOfMonth.toISOString());
 
       return {
@@ -370,9 +371,36 @@ export class DashboardService {
    */
   static async getFollowupsNeededCount(): Promise<number> {
     try {
-      // This would typically come from a backend API
-      // For now, return a sample value
-      return 5;
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = userData?.user;
+      if (!currentUser) return 0;
+
+      const userEmail = currentUser.email || '';
+      if (!userEmail) return 0;
+
+      // Get distinct recipients the user has emailed
+      const { data: sentRows, error: sentErr } = await supabase
+        .from('useremaillog')
+        .select('to')
+        .eq('user_id', userEmail)
+        .not('to', 'is', null);
+      if (sentErr) return 0;
+      const uniqueSent = new Set((sentRows || []).map(r => String(r.to).toLowerCase()).filter(Boolean));
+
+      // Get distinct recipients who have replied
+      const { data: repliedRows, error: replyErr } = await supabase
+        .from('replies_kpi')
+        .select('to')
+        .eq('user_id', userEmail)
+        .eq('reply', true)
+        .not('to', 'is', null);
+      if (replyErr) return uniqueSent.size;
+      const uniqueReplied = new Set((repliedRows || []).map(r => String(r.to).toLowerCase()).filter(Boolean));
+
+      // Pending follow-ups are sent recipients without a recorded reply
+      let pending = 0;
+      uniqueSent.forEach(addr => { if (!uniqueReplied.has(addr)) pending += 1; });
+      return Math.max(0, pending);
     } catch (error) {
       console.error('Error fetching followups needed count:', error);
       return 0;
@@ -384,10 +412,19 @@ export class DashboardService {
    */
   static async getRepliesReceivedCount(): Promise<number> {
     try {
-      // This would typically come from a backend API
-      // For now, return a sample value based on response rate
-      const stats = await this.getEmailOutreachStats();
-      return Math.round((stats.response_rate / 100) * stats.total_emails_sent);
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = userData?.user;
+      if (!currentUser) return 0;
+
+      const userEmail = currentUser.email || '';
+      if (!userEmail) return 0;
+
+      const { count } = await supabase
+        .from('replies_kpi')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userEmail)
+        .eq('reply', true);
+      return count || 0;
     } catch (error) {
       console.error('Error fetching replies received count:', error);
       return 0;
@@ -399,12 +436,33 @@ export class DashboardService {
    */
   static async getTotalContactsCount(): Promise<number> {
     try {
-      // This would typically come from a backend API
-      // For now, return a sample value
-      return 25;
+      const { count } = await supabase
+        .from('testdb')
+        .select('*', { count: 'exact', head: true });
+      return count || 0;
     } catch (error) {
       console.error('Error fetching total contacts count:', error);
       return 0;
+    }
+  }
+
+  /**
+   * Get list of contacts (email addresses) who have replied
+   */
+  static async getContactsWhoReplied(userEmail: string): Promise<string[]> {
+    try {
+      if (!userEmail) return [];
+      const { data, error } = await supabase
+        .from('replies_kpi')
+        .select('to')
+        .eq('user_id', userEmail)
+        .eq('reply', true)
+        .not('to', 'is', null);
+      if (error) return [];
+      const unique = Array.from(new Set((data || []).map(r => String(r.to).toLowerCase()).filter(Boolean)));
+      return unique;
+    } catch (error) {
+      return [];
     }
   }
 
