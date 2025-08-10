@@ -40,10 +40,34 @@ import { RainbowButton } from "@/components/ui/rainbow-button";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button";
 import { usePremiumUser } from "@/hooks/usePremiumUser";
+import { useEffect, useState } from "react";
+import { DashboardService, DashboardStats } from "@/services/dashboardService";
 import { PremiumCard, PremiumHeader } from "@/components/ui/premium-badge";
 
 export const MainDashboard = () => {
   const { isPremium, premiumData, loading: premiumLoading } = usePremiumUser();
+  const [emailStats, setEmailStats] = useState<{ total: number; replies: number } | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const [email, s] = await Promise.all([
+        (async () => {
+          const e = await DashboardService.getEmailOutreachStats();
+          return { total: e.total_emails_sent, replies: Math.round((e.response_rate / 100) * e.total_emails_sent) };
+        })(),
+        DashboardService.getDashboardStats(),
+      ]);
+      if (mounted) {
+        setEmailStats(email);
+        setStats(s);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <div className="px-4 md:px-0">
@@ -163,20 +187,20 @@ export const MainDashboard = () => {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="bg-blue-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-700">45</div>
+                  <div className="text-2xl font-bold text-blue-700">{emailStats?.total ?? '…'}</div>
                   <div className="text-xs text-gray-600">Emails Sent</div>
                 </div>
                 <div className="bg-green-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-700">12</div>
+                  <div className="text-2xl font-bold text-green-700">{emailStats?.replies ?? '…'}</div>
                   <div className="text-xs text-gray-600">Responses</div>
                 </div>
                 <div className="bg-amber-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-amber-700">8</div>
+                  <div className="text-2xl font-bold text-amber-700">{stats?.pending_applications ?? '…'}</div>
                   <div className="text-xs text-gray-600">Pending</div>
                 </div>
                 <div className="bg-indigo-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-indigo-700">3</div>
-                  <div className="text-xs text-gray-600">Interviews</div>
+                  <div className="text-2xl font-bold text-indigo-700">{stats?.interview_requests ?? '…'}</div>
+                  <div className="text-xs text-gray-600">Reviewed Applications</div>
                 </div>
               </div>
             </CardContent>
@@ -364,19 +388,19 @@ export const MainDashboard = () => {
             <CardContent className="pt-2">
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="bg-blue-50 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-blue-700">{isPremium ? '247' : '127'}</div>
-                  <div className="text-xs text-gray-600">Profile Views</div>
+                  <div className="text-xl font-bold text-blue-700">{stats?.total_jobs_viewed ?? 0}</div>
+                  <div className="text-xs text-gray-600">Jobs Viewed</div>
                 </div>
                 <div className="bg-amber-50 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-amber-700">{isPremium ? '95%' : '85%'}</div>
+                  <div className="text-xl font-bold text-amber-700">{`${stats?.profile_completion_percentage ?? 0}%`}</div>
                   <div className="text-xs text-gray-600">Resume Score</div>
                 </div>
                 <div className="bg-green-50 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-green-700">{isPremium ? '47' : '23'}</div>
+                  <div className="text-xl font-bold text-green-700">{emailStats?.replies ?? 0}</div>
                   <div className="text-xs text-gray-600">Connections</div>
                 </div>
                 <div className="bg-purple-50 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-purple-700">{isPremium ? '98%' : '92%'}</div>
+                  <div className="text-xl font-bold text-purple-700">{`${stats?.profile_completion_percentage ?? 0}%`}</div>
                   <div className="text-xs text-gray-600">Completion</div>
                 </div>
               </div>

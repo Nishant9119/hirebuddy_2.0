@@ -1,4 +1,5 @@
 import { apiClient, ApiResponse } from '../lib/api';
+import { supabase } from '@/lib/supabase';
 
 export interface UserProfile {
   id: string;
@@ -120,7 +121,62 @@ export class DashboardService {
         return response.data;
       }
       
-      // Return default stats if API call fails
+      // Fallback to direct Supabase queries for live per-user stats
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = userData?.user;
+      if (!currentUser) {
+        return {
+          total_applications: 0,
+          pending_applications: 0,
+          interview_requests: 0,
+          total_jobs_viewed: 0,
+          profile_completion_percentage: 0,
+          recent_activity_count: 0
+        };
+      }
+
+      const userId = currentUser.id;
+
+      // Total applications
+      const { count: totalApplications } = await supabase
+        .from('hirebuddy_job_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      // Pending applications
+      const { count: pendingApplications } = await supabase
+        .from('hirebuddy_job_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'pending');
+
+      // Reviewed applications (use this to replace interview_requests on UI)
+      const { count: reviewedApplications } = await supabase
+        .from('hirebuddy_job_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .not('reviewed_at', 'is', null);
+
+      // Recent activity count: applications in last 7 days
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const { count: recentActivityCount } = await supabase
+        .from('hirebuddy_job_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', sevenDaysAgo.toISOString());
+
+      return {
+        total_applications: totalApplications || 0,
+        pending_applications: pendingApplications || 0,
+        interview_requests: reviewedApplications || 0,
+        total_jobs_viewed: 0,
+        profile_completion_percentage: 0,
+        recent_activity_count: recentActivityCount || 0
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      // Conservative fallback
       return {
         total_applications: 0,
         pending_applications: 0,
@@ -128,17 +184,6 @@ export class DashboardService {
         total_jobs_viewed: 0,
         profile_completion_percentage: 0,
         recent_activity_count: 0
-      };
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-      // Return sample stats for testing
-      return {
-        total_applications: 5,
-        pending_applications: 3,
-        interview_requests: 1,
-        total_jobs_viewed: 25,
-        profile_completion_percentage: 75,
-        recent_activity_count: 8
       };
     }
   }
@@ -253,9 +298,42 @@ export class DashboardService {
         };
       }
       
+      // Fallback to Supabase: compute from useremaillog
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = userData?.user;
+      if (!currentUser) {
+        return {
+          total_emails_sent: 0,
+          emails_this_month: 0,
+          remaining_emails: 0,
+          email_limit: 0,
+          success_rate: 0,
+          response_rate: 0
+        };
+      }
+
+      const userId = currentUser.id;
+
+      // Total emails sent
+      const { count: totalSent } = await supabase
+        .from('useremaillog')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      // Emails sent this month
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const { count: thisMonth } = await supabase
+        .from('useremaillog')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('sent_at', startOfMonth.toISOString());
+
       return {
-        total_emails_sent: 0,
-        emails_this_month: 0,
+        total_emails_sent: totalSent || 0,
+        emails_this_month: thisMonth || 0,
         remaining_emails: 0,
         email_limit: 0,
         success_rate: 0,
@@ -264,12 +342,12 @@ export class DashboardService {
     } catch (error) {
       console.error('Error fetching email stats:', error);
       return {
-        total_emails_sent: 15,
-        emails_this_month: 8,
-        remaining_emails: 42,
-        email_limit: 50,
-        success_rate: 85.5,
-        response_rate: 12.3
+        total_emails_sent: 0,
+        emails_this_month: 0,
+        remaining_emails: 0,
+        email_limit: 0,
+        success_rate: 0,
+        response_rate: 0
       };
     }
   }

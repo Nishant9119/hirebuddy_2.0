@@ -1,37 +1,57 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const stats = [
-  {
-    title: "Applications Sent",
-    value: "27",
-    change: "+5 this week",
-    color: "text-primary"
-  },
-  {
-    title: "Interview Invites",
-    value: "4",
-    change: "+2 this week",
-    color: "text-primary"
-  },
-  {
-    title: "AI Match Score",
-    value: "94%",
-    change: "+3% improved",
-    color: "text-primary"
-  },
-  {
-    title: "Profile Views",
-    value: "156",
-    change: "+23 this week",
-    color: "text-primary"
-  }
-];
+import { useEffect, useState } from "react";
+import { DashboardService, DashboardStats as StatsType } from "@/services/dashboardService";
 
 export const DashboardStats = () => {
+  const [stats, setStats] = useState<StatsType | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await DashboardService.getDashboardStats();
+        if (mounted) setStats(data);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const items = [
+    {
+      title: "Applications Sent",
+      value: stats?.total_applications ?? 0,
+      change: `${stats?.recent_activity_count ?? 0} this week`,
+      color: "text-primary",
+    },
+    {
+      title: "Reviewed Applications",
+      value: stats?.interview_requests ?? 0,
+      change: `${stats?.total_applications ? Math.round(((stats?.interview_requests || 0) / Math.max(stats?.total_applications || 1, 1)) * 100) : 0}% conversion`,
+      color: "text-primary",
+    },
+    {
+      title: "Profile Completion",
+      value: `${stats?.profile_completion_percentage ?? 0}%`,
+      change: "",
+      color: "text-primary",
+    },
+    {
+      title: "Jobs Viewed",
+      value: stats?.total_jobs_viewed ?? 0,
+      change: "",
+      color: "text-primary",
+    },
+  ];
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat, index) => (
+      {items.map((stat, index) => (
         <Card key={index} className="hover:shadow-md transition-shadow border-pink-100">
           <CardHeader className="pb-2 border-b bg-gradient-to-r from-pink-50 to-pink-100">
             <CardTitle className="text-sm font-medium text-gray-600">
@@ -40,11 +60,13 @@ export const DashboardStats = () => {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${stat.color}`}>
-              {stat.value}
+              {loading ? '…' : stat.value}
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {stat.change}
-            </p>
+            {stat.change && (
+              <p className="text-xs text-gray-500 mt-1">
+                {loading ? '' : stat.change}
+              </p>
+            )}
           </CardContent>
         </Card>
       ))}

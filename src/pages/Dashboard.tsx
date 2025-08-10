@@ -793,13 +793,13 @@ const Dashboard = () => {
                         isPremium={isPremium}
                       />
                       <MobileMetricCard
-                        label={isPremium ? "Exclusive Interviews" : "Interview Requests"}
+                        label={isPremium ? "Reviewed Applications" : "Reviewed Applications"}
                         value={formatNumber(dashboardStats?.interview_requests || 0)}
                         change={(dashboardStats?.interview_requests || 0) > 0 
                           ? `${Math.round(((dashboardStats?.interview_requests || 0) / Math.max(dashboardStats?.total_applications || 1, 1)) * 100)}% conversion`
                           : '+0% conversion'}
                         icon={Calendar}
-                        subtitle={isPremium ? "From applications" : "From applications"}
+                        subtitle={"From applications"}
                         isPremium={isPremium}
                       />
                     </div>
@@ -827,13 +827,13 @@ const Dashboard = () => {
                         isPremium={isPremium}
                       />
                       <EnhancedMetricCard
-                        label={isPremium ? "Exclusive Interviews" : "Interview Requests"}
+                        label={isPremium ? "Reviewed Applications" : "Reviewed Applications"}
                         value={formatNumber(dashboardStats?.interview_requests || 0)}
                         change={(dashboardStats?.interview_requests || 0) > 0 
                           ? `${Math.round(((dashboardStats?.interview_requests || 0) / Math.max(dashboardStats?.total_applications || 1, 1)) * 100)}% conversion`
                           : '+0% conversion'}
                         icon={Calendar}
-                        subtitle={isPremium ? "From applications" : "From applications"}
+                        subtitle={"From applications"}
                         trend={[0, 1, 0, 2, 1, 1, 2]}
                         isPremium={isPremium}
                       />
