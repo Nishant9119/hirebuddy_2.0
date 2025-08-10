@@ -18,7 +18,11 @@ class ApiClient {
     this.baseURL = getConfig().api.baseUrl;
     
     // Load token from localStorage on initialization
-    this.token = localStorage.getItem('auth_token');
+    try {
+      this.token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    } catch {
+      this.token = null;
+    }
   }
 
   /**

@@ -83,6 +83,56 @@ interface JobsApiResponse {
 }
 
 export class DashboardService {
+  private static async getDashboardStatsFromSupabase(): Promise<DashboardStats> {
+    const { data: userData } = await supabase.auth.getUser();
+    const currentUser = userData?.user;
+    if (!currentUser) {
+      return {
+        total_applications: 0,
+        pending_applications: 0,
+        interview_requests: 0,
+        total_jobs_viewed: 0,
+        profile_completion_percentage: 0,
+        recent_activity_count: 0
+      };
+    }
+
+    const userId = currentUser.id;
+
+    const { count: totalApplications } = await supabase
+      .from('hirebuddy_job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    const { count: pendingApplications } = await supabase
+      .from('hirebuddy_job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'pending');
+
+    const { count: reviewedApplications } = await supabase
+      .from('hirebuddy_job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .not('reviewed_at', 'is', null);
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const { count: recentActivityCount } = await supabase
+      .from('hirebuddy_job_applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', sevenDaysAgo.toISOString());
+
+    return {
+      total_applications: totalApplications || 0,
+      pending_applications: pendingApplications || 0,
+      interview_requests: reviewedApplications || 0,
+      total_jobs_viewed: 0,
+      profile_completion_percentage: 0,
+      recent_activity_count: recentActivityCount || 0
+    };
+  }
   private static hasBackendToken(): boolean {
     try {
       if (typeof window === 'undefined') return false;
@@ -124,78 +174,10 @@ export class DashboardService {
    */
   static async getDashboardStats(): Promise<DashboardStats> {
     try {
-      const response = await apiClient.getDashboardStats() as ApiResponse<DashboardStats>;
-      
-      if (response.success && response.data) {
-        // Normalize backend response (which may use camelCase) to our expected snake_case shape
-        const d: any = response.data as any;
-        const mapped: DashboardStats = {
-          total_applications: d.total_applications ?? d.totalApplications ?? 0,
-          pending_applications: d.pending_applications ?? d.pending ?? d.pendingApplications ?? 0,
-          interview_requests: d.interview_requests ?? d.interviewInvites ?? 0,
-          total_jobs_viewed: d.total_jobs_viewed ?? d.profileViews ?? 0,
-          profile_completion_percentage: d.profile_completion_percentage ?? d.profileCompletion ?? 0,
-          recent_activity_count: d.recent_activity_count ?? d.weeklyApplications ?? 0,
-        };
-        return mapped;
-      }
-      
-      // Fallback to direct Supabase queries for live per-user stats
-      const { data: userData } = await supabase.auth.getUser();
-      const currentUser = userData?.user;
-      if (!currentUser) {
-        return {
-          total_applications: 0,
-          pending_applications: 0,
-          interview_requests: 0,
-          total_jobs_viewed: 0,
-          profile_completion_percentage: 0,
-          recent_activity_count: 0
-        };
-      }
-
-      const userId = currentUser.id;
-
-      // Total applications
-      const { count: totalApplications } = await supabase
-        .from('hirebuddy_job_applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-
-      // Pending applications
-      const { count: pendingApplications } = await supabase
-        .from('hirebuddy_job_applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', 'pending');
-
-      // Reviewed applications (use this to replace interview_requests on UI)
-      const { count: reviewedApplications } = await supabase
-        .from('hirebuddy_job_applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .not('reviewed_at', 'is', null);
-
-      // Recent activity count: applications in last 7 days
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const { count: recentActivityCount } = await supabase
-        .from('hirebuddy_job_applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .gte('created_at', sevenDaysAgo.toISOString());
-
-      return {
-        total_applications: totalApplications || 0,
-        pending_applications: pendingApplications || 0,
-        interview_requests: reviewedApplications || 0,
-        total_jobs_viewed: 0,
-        profile_completion_percentage: 0,
-        recent_activity_count: recentActivityCount || 0
-      };
+      // Per user live stats directly from the database (no backend API)
+      return await this.getDashboardStatsFromSupabase();
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-      // Conservative fallback
+      console.error('Error fetching dashboard stats from Supabase:', error);
       return {
         total_applications: 0,
         pending_applications: 0,
@@ -303,33 +285,18 @@ export class DashboardService {
    */
   static async getEmailOutreachStats(): Promise<EmailOutreachStats> {
     try {
-      if (!this.hasBackendToken()) {
-        return await this.getEmailOutreachStatsFromSupabase();
-      }
-
-      const response = await apiClient.getEmailUsage() as ApiResponse<EmailUsageResponse>;
-
-      if (response.success && response.data && typeof response.data === 'object') {
-        const data: any = response.data as any;
-        // Support both legacy shape (total_sent/this_month) and backend shape (used/limit/remaining)
-        const totalSent = data.total_sent ?? data.used ?? 0;
-        const limit = data.limit ?? 0;
-        const remaining = data.remaining ?? Math.max(0, (limit || 0) - (totalSent || 0));
-        return {
-          total_emails_sent: totalSent,
-          emails_this_month: data.this_month ?? 0,
-          remaining_emails: remaining,
-          email_limit: limit,
-          success_rate: data.success_rate ?? 0,
-          response_rate: data.response_rate ?? 0
-        };
-      }
-
-      // Non-success response: use Supabase fallback
+      // Always fetch directly from the database (no backend API)
       return await this.getEmailOutreachStatsFromSupabase();
     } catch (error) {
-      console.error('Error fetching email stats from API, using Supabase fallback:', error);
-      return await this.getEmailOutreachStatsFromSupabase();
+      console.error('Error fetching email outreach stats from Supabase:', error);
+      return {
+        total_emails_sent: 0,
+        emails_this_month: 0,
+        remaining_emails: 0,
+        email_limit: 0,
+        success_rate: 0,
+        response_rate: 0
+      };
     }
   }
 
@@ -346,32 +313,45 @@ export class DashboardService {
         response_rate: 0
       };
     }
+    // Prefer total from aggregated totalemailcounttable using user_id (UUID)
+    const userId = currentUser.id;
+    const { data: countRow, error: countErr } = await supabase
+      .from('totalemailcounttable')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
 
-    // Our useremaillog table uses user email as user_id
+    let totalSent = countRow?.total_count ?? 0;
+    let emailLimit = countRow?.email_limit ?? 0;
+    let remaining = Math.max(0, (emailLimit || 0) - (totalSent || 0));
+
+    // Optionally compute this month from useremaillog if available (uses email or id)
     const userIdentifier = currentUser.email || currentUser.id;
-
-    // Total emails sent
-    const { count: totalSent } = await supabase
-      .from('useremaillog')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userIdentifier);
-
-    // Emails sent this month
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
-
     const { count: thisMonth } = await supabase
       .from('useremaillog')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userIdentifier)
       .gte('sent_at', startOfMonth.toISOString());
 
+    // Fallback for total if totalemailcounttable is not accessible
+    if (!countRow || countErr) {
+      const { count: totalFromLog } = await supabase
+        .from('useremaillog')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userIdentifier);
+      totalSent = totalFromLog || 0;
+      emailLimit = 0;
+      remaining = 0;
+    }
+
     return {
       total_emails_sent: totalSent || 0,
       emails_this_month: thisMonth || 0,
-      remaining_emails: 0,
-      email_limit: 0,
+      remaining_emails: remaining,
+      email_limit: emailLimit,
       success_rate: 0,
       response_rate: 0
     };
