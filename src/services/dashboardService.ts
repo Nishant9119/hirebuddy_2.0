@@ -127,7 +127,17 @@ export class DashboardService {
       const response = await apiClient.getDashboardStats() as ApiResponse<DashboardStats>;
       
       if (response.success && response.data) {
-        return response.data;
+        // Normalize backend response (which may use camelCase) to our expected snake_case shape
+        const d: any = response.data as any;
+        const mapped: DashboardStats = {
+          total_applications: d.total_applications ?? d.totalApplications ?? 0,
+          pending_applications: d.pending_applications ?? d.pending ?? d.pendingApplications ?? 0,
+          interview_requests: d.interview_requests ?? d.interviewInvites ?? 0,
+          total_jobs_viewed: d.total_jobs_viewed ?? d.profileViews ?? 0,
+          profile_completion_percentage: d.profile_completion_percentage ?? d.profileCompletion ?? 0,
+          recent_activity_count: d.recent_activity_count ?? d.weeklyApplications ?? 0,
+        };
+        return mapped;
       }
       
       // Fallback to direct Supabase queries for live per-user stats
@@ -300,14 +310,18 @@ export class DashboardService {
       const response = await apiClient.getEmailUsage() as ApiResponse<EmailUsageResponse>;
 
       if (response.success && response.data && typeof response.data === 'object') {
-        const data = response.data;
+        const data: any = response.data as any;
+        // Support both legacy shape (total_sent/this_month) and backend shape (used/limit/remaining)
+        const totalSent = data.total_sent ?? data.used ?? 0;
+        const limit = data.limit ?? 0;
+        const remaining = data.remaining ?? Math.max(0, (limit || 0) - (totalSent || 0));
         return {
-          total_emails_sent: data.total_sent || 0,
-          emails_this_month: data.this_month || 0,
-          remaining_emails: data.remaining || 0,
-          email_limit: data.limit || 0,
-          success_rate: data.success_rate || 0,
-          response_rate: data.response_rate || 0
+          total_emails_sent: totalSent,
+          emails_this_month: data.this_month ?? 0,
+          remaining_emails: remaining,
+          email_limit: limit,
+          success_rate: data.success_rate ?? 0,
+          response_rate: data.response_rate ?? 0
         };
       }
 
