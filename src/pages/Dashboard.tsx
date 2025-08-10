@@ -347,6 +347,51 @@ const EnhancedJobCard = ({
 
 // Activity Timeline Component
 const ActivityTimeline = ({ activities }: { activities: RecentActivity[] }) => {
+  const getBgClassForType = (type: RecentActivity['type']): string => {
+    switch (type) {
+      case 'application':
+        return 'bg-blue-100';
+      case 'profile_update':
+        return 'bg-purple-100';
+      case 'job_view':
+        return 'bg-orange-100';
+      case 'recommendation':
+        return 'bg-green-100';
+      default:
+        return 'bg-gray-100';
+    }
+  };
+
+  const getIconForType = (type: RecentActivity['type']): string => {
+    switch (type) {
+      case 'application':
+        return '📄';
+      case 'profile_update':
+        return '👤';
+      case 'job_view':
+        return '👀';
+      case 'recommendation':
+        return '⭐';
+      default:
+        return '•';
+    }
+  };
+
+  const formatTimeAgo = (iso: string): string => {
+    try {
+      const date = new Date(iso);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays}d ago`;
+    } catch {
+      return 'Recently';
+    }
+  };
   if (!activities || activities.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
@@ -359,21 +404,15 @@ const ActivityTimeline = ({ activities }: { activities: RecentActivity[] }) => {
 
   return (
     <div className="space-y-4">
-      {activities.map((activity, index) => (
+      {activities.map((activity) => (
         <div key={activity.id} className="flex items-start gap-3">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            activity.color === 'blue' ? 'bg-blue-100' :
-            activity.color === 'green' ? 'bg-green-100' :
-            activity.color === 'purple' ? 'bg-purple-100' :
-            activity.color === 'orange' ? 'bg-orange-100' :
-            'bg-red-100'
-          }`}>
-            <span className="text-sm">{activity.icon}</span>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getBgClassForType(activity.type)}`}>
+            <span className="text-sm">{getIconForType(activity.type)}</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-            {activity.company && <p className="text-xs text-gray-600">{activity.company}</p>}
-            <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+            {activity.description && <p className="text-xs text-gray-600">{activity.description}</p>}
+            <p className="text-xs text-gray-500 mt-1">{formatTimeAgo(activity.timestamp)}</p>
           </div>
         </div>
       ))}
@@ -470,22 +509,17 @@ const Dashboard = () => {
         ] = await Promise.all([
           DashboardService.getDashboardStats().catch(err => {
             console.error('Error loading dashboard stats:', err);
-            // Return fallback stats instead of null
+            // Return fallback stats matching DashboardStats interface
             return {
-              totalApplications: 0,
-              interviewInvites: 0,
-              profileViews: 0,
-              weeklyApplications: 0,
-              weeklyGoal: 15,
-              applicationsByStatus: {
-                applied: 0, screening: 0, interview_scheduled: 0, interviewed: 0,
-                technical_assessment: 0, final_round: 0, offer_received: 0,
-                accepted: 0, rejected: 0, withdrawn: 0,
-              },
-              weeklyTrend: [0, 0, 0, 0, 0, 0, 0],
-            };
+              total_applications: 0,
+              pending_applications: 0,
+              interview_requests: 0,
+              total_jobs_viewed: 0,
+              profile_completion_percentage: 0,
+              recent_activity_count: 0,
+            } as DashboardStats;
           }),
-          DashboardService.getRecentActivity(4).catch(err => {
+          DashboardService.getRecentActivity().catch(err => {
             console.error('Error loading recent activity:', err);
             return [];
           }),
@@ -501,13 +535,13 @@ const Dashboard = () => {
           DashboardService.getEmailOutreachStats().catch(err => {
             console.error('Error loading email stats:', err);
             return {
-              emailsSent: 0,
-              openRate: 0,
-              responseRate: 0,
-              campaignsActive: 0,
-              responsesReceived: 0,
-              interviewRequests: 0,
-            };
+              total_emails_sent: 0,
+              emails_this_month: 0,
+              remaining_emails: 0,
+              email_limit: 0,
+              success_rate: 0,
+              response_rate: 0,
+            } as EmailOutreachStats;
           })
         ]);
 
@@ -521,10 +555,10 @@ const Dashboard = () => {
         // Determine connection status based on data quality
         setConnectionStatus('connected'); // Default to connected
 
-        setDashboardStats(statsData);
+        setDashboardStats(statsData as DashboardStats);
         setRecentActivity(activityData);
         setUserProfile(profileData);
-        setEmailStats(emailData);
+        setEmailStats(emailData as EmailOutreachStats);
 
 
 
@@ -555,14 +589,7 @@ const Dashboard = () => {
     return num.toString();
   };
 
-  const getWeeklyTrendChange = () => {
-    if (!dashboardStats?.weeklyTrend || dashboardStats.weeklyTrend.length < 2) return '+0%';
-    const recent = dashboardStats.weeklyTrend.slice(-3).reduce((a, b) => a + b, 0);
-    const previous = dashboardStats.weeklyTrend.slice(-6, -3).reduce((a, b) => a + b, 0);
-    if (previous === 0) return recent > 0 ? '+100%' : '+0%';
-    const change = ((recent - previous) / previous) * 100;
-    return `${change >= 0 ? '+' : ''}${change.toFixed(0)}%`;
-  };
+  // Removed weekly trend change calculation since stats do not include trend series
 
   if (error) {
     return (
@@ -749,27 +776,27 @@ const Dashboard = () => {
                     <div className="md:hidden mobile-grid-stack">
                       <MobileMetricCard
                         label={isPremium ? "Premium Applications" : "Jobs Applied"}
-                        value={formatNumber(dashboardStats?.totalApplications || 0)}
-                        change={`${dashboardStats?.weeklyApplications || 0} this week`}
+                        value={formatNumber(dashboardStats?.total_applications || 0)}
+                        change={`${dashboardStats?.recent_activity_count || 0} recent activities`}
                         icon={Briefcase}
                         subtitle={isPremium ? "Total applications" : "Total applications"}
                         isPremium={isPremium}
                       />
                       <MobileMetricCard
                         label={isPremium ? "Premium Outreach" : "Emails Sent"}
-                        value={formatNumber(emailStats?.emailsSent || 0)}
-                        change={emailStats?.emailsSent && emailStats.emailsSent > 0 
-                          ? `${emailStats.responseRate}% response rate`
+                        value={formatNumber(emailStats?.total_emails_sent || 0)}
+                        change={(emailStats?.total_emails_sent || 0) > 0 
+                          ? `${Math.round(emailStats?.response_rate || 0)}% response rate`
                           : '+0% response rate'}
                         icon={Mail}
-                        subtitle={isPremium ? `${emailStats?.responsesReceived || 0} responses` : `${emailStats?.responsesReceived || 0} responses`}
+                        subtitle={`${Math.round(((emailStats?.response_rate || 0) / 100) * (emailStats?.total_emails_sent || 0))} responses`}
                         isPremium={isPremium}
                       />
                       <MobileMetricCard
-                        label={isPremium ? "Exclusive Interviews" : "Interview Invites"}
-                        value={formatNumber(dashboardStats?.interviewInvites || 0)}
-                        change={dashboardStats?.interviewInvites && dashboardStats.interviewInvites > 0 
-                          ? `${Math.round((dashboardStats.interviewInvites / (dashboardStats.totalApplications || 1)) * 100)}% conversion`
+                        label={isPremium ? "Exclusive Interviews" : "Interview Requests"}
+                        value={formatNumber(dashboardStats?.interview_requests || 0)}
+                        change={(dashboardStats?.interview_requests || 0) > 0 
+                          ? `${Math.round(((dashboardStats?.interview_requests || 0) / Math.max(dashboardStats?.total_applications || 1, 1)) * 100)}% conversion`
                           : '+0% conversion'}
                         icon={Calendar}
                         subtitle={isPremium ? "From applications" : "From applications"}
@@ -781,29 +808,29 @@ const Dashboard = () => {
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-4">
                       <EnhancedMetricCard
                         label={isPremium ? "Premium Applications" : "Jobs Applied"}
-                        value={formatNumber(dashboardStats?.totalApplications || 0)}
-                        change={`${dashboardStats?.weeklyApplications || 0} this week`}
+                        value={formatNumber(dashboardStats?.total_applications || 0)}
+                        change={`${dashboardStats?.recent_activity_count || 0} recent activities`}
                         icon={Briefcase}
                         subtitle={isPremium ? "Total applications" : "Total applications"}
-                        trend={dashboardStats?.weeklyTrend || [0, 0, 0, 0, 0, 0, 0]}
+                        trend={[0, 0, 0, 0, 0, 0, 0]}
                         isPremium={isPremium}
                       />
                       <EnhancedMetricCard
                         label={isPremium ? "Premium Outreach" : "Emails Sent"}
-                        value={formatNumber(emailStats?.emailsSent || 0)}
-                        change={emailStats?.emailsSent && emailStats.emailsSent > 0 
-                          ? `${emailStats.responseRate}% response rate`
+                        value={formatNumber(emailStats?.total_emails_sent || 0)}
+                        change={(emailStats?.total_emails_sent || 0) > 0 
+                          ? `${Math.round(emailStats?.response_rate || 0)}% response rate`
                           : '+0% response rate'}
                         icon={Mail}
-                        subtitle={isPremium ? `${emailStats?.responsesReceived || 0} responses` : `${emailStats?.responsesReceived || 0} responses`}
+                        subtitle={`${Math.round(((emailStats?.response_rate || 0) / 100) * (emailStats?.total_emails_sent || 0))} responses`}
                         trend={[2, 3, 1, 4, 2, 5, 3]}
                         isPremium={isPremium}
                       />
                       <EnhancedMetricCard
-                        label={isPremium ? "Exclusive Interviews" : "Interview Invites"}
-                        value={formatNumber(dashboardStats?.interviewInvites || 0)}
-                        change={dashboardStats?.interviewInvites && dashboardStats.interviewInvites > 0 
-                          ? `${Math.round((dashboardStats.interviewInvites / (dashboardStats.totalApplications || 1)) * 100)}% conversion`
+                        label={isPremium ? "Exclusive Interviews" : "Interview Requests"}
+                        value={formatNumber(dashboardStats?.interview_requests || 0)}
+                        change={(dashboardStats?.interview_requests || 0) > 0 
+                          ? `${Math.round(((dashboardStats?.interview_requests || 0) / Math.max(dashboardStats?.total_applications || 1, 1)) * 100)}% conversion`
                           : '+0% conversion'}
                         icon={Calendar}
                         subtitle={isPremium ? "From applications" : "From applications"}

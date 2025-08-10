@@ -553,51 +553,53 @@ export class JobService {
       console.warn('API stats failed, falling back to direct database query:', error);
     }
 
-    // Fallback to direct database queries
+    // Fallback to direct database queries against hirebuddy_job_board
     try {
-      
-      // Get total jobs count from testdb table
+      // Get total jobs count
       const { count: totalCount, error: totalError } = await supabase
-        .from('testdb')
-        .select('*', { count: 'exact' });
+        .from('hirebuddy_job_board')
+        .select('*', { count: 'exact', head: true });
 
       if (totalError) {
-        console.error('Error getting total count:', totalError);
+        console.error('Error getting total jobs count:', totalError);
       }
 
-      // Get remote jobs count (check title for remote keywords)
+      // Get remote jobs count (remote_flag = true OR probably_remote = true)
       const { count: remoteCount, error: remoteError } = await supabase
-        .from('testdb')
-        .select('*', { count: 'exact' })
-        .or('title.ilike.%remote%,title.ilike.%work from home%,title.ilike.%wfh%');
+        .from('hirebuddy_job_board')
+        .select('*', { count: 'exact', head: true })
+        .or('remote_flag.eq.true,probably_remote.eq.true');
 
       if (remoteError) {
-        console.error('Error getting remote count:', remoteError);
+        console.error('Error getting remote jobs count:', remoteError);
       }
 
-      // Get companies count (distinct company names)
+      // Get unique companies count (client-side distinct)
       const { data: companiesData, error: companiesError } = await supabase
-        .from('testdb')
+        .from('hirebuddy_job_board')
         .select('company_name')
         .not('company_name', 'is', null);
 
       let companiesCount = 0;
       if (!companiesError && companiesData) {
-        const uniqueCompanies = new Set(companiesData.map(item => item.company_name));
+        const uniqueCompanies = new Set((companiesData as { company_name: string }[]).map(item => item.company_name));
         companiesCount = uniqueCompanies.size;
+      } else if (companiesError) {
+        console.error('Error getting companies:', companiesError);
       }
 
-      // Get this week's jobs count
+      // Get jobs created in the last 7 days
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      
+      const oneWeekAgoDateOnly = oneWeekAgo.toISOString().slice(0, 10); // YYYY-MM-DD for date column
+
       const { count: thisWeekCount, error: weekError } = await supabase
-        .from('testdb')
-        .select('*', { count: 'exact' })
-        .gte('created_at', oneWeekAgo.toISOString());
+        .from('hirebuddy_job_board')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', oneWeekAgoDateOnly);
 
       if (weekError) {
-        console.error('Error getting this week count:', weekError);
+        console.error('Error getting this week jobs count:', weekError);
       }
 
       const stats = {
@@ -607,12 +609,10 @@ export class JobService {
         companies: companiesCount
       };
 
-      console.log('Direct database stats:', stats);
+      console.log('Direct database stats (hirebuddy_job_board):', stats);
       return stats;
-      
     } catch (dbError) {
       console.error('Error fetching job stats from database:', dbError);
-      // Return default values
       return { total: 0, remote: 0, thisWeek: 0, companies: 0 };
     }
   }

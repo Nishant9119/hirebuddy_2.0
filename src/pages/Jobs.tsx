@@ -674,9 +674,7 @@ const Jobs = () => {
                       <Briefcase className="w-2.5 h-2.5 md:w-4 md:h-4" />
                       <span className="hidden sm:inline">All Jobs</span>
                       <span className="sm:hidden">All</span>
-                      <Badge variant="secondary" className="ml-0.5 md:ml-1 mobile-body-xs px-1">
-                        {getTabCount('all')}
-                      </Badge>
+                      
                     </TabsTrigger>
                     <TabsTrigger value="applied" className="flex items-center gap-1 md:gap-2 px-1 md:px-3 mobile-body-xs md:text-sm">
                       <Send className="w-2.5 h-2.5 md:w-4 md:h-4" />
@@ -690,9 +688,7 @@ const Jobs = () => {
                       <Globe className="w-2.5 h-2.5 md:w-4 md:h-4" />
                       <span className="hidden sm:inline">Remote</span>
                       <span className="sm:hidden">Rem</span>
-                      <Badge variant="secondary" className="ml-0.5 md:ml-1 mobile-body-xs px-1">
-                        {getTabCount('remote')}
-                      </Badge>
+                      
                     </TabsTrigger>
                     <TabsTrigger value="exclusive" className="flex items-center gap-1 md:gap-2 px-1 md:px-3 mobile-body-xs md:text-sm">
                       <Star className="w-2.5 h-2.5 md:w-4 md:h-4" />
