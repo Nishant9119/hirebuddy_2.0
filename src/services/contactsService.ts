@@ -291,9 +291,21 @@ class ContactsService {
         console.warn('followuplogs table might not exist:', dbError);
       }
 
-      // Get contacts who have replied (exclude them from follow-up)
-      const contactsWhoReplied = await DashboardService.getContactsWhoReplied(user.user.email);
-      const repliedContactsSet = new Set(contactsWhoReplied.map(email => email.toLowerCase()));
+      // Get contacts who have replied (exclude them from follow-up) directly from replies_kpi
+      let repliedContactsSet = new Set<string>();
+      try {
+        const { data: replies, error: repliesErr } = await supabase
+          .from('replies_kpi')
+          .select('to')
+          .eq('user_id', user.user.email)
+          .eq('reply', true)
+          .not('to', 'is', null);
+        if (!repliesErr) {
+          repliedContactsSet = new Set((replies || []).map(r => String(r.to).toLowerCase()).filter(Boolean));
+        }
+      } catch (reErr) {
+        console.warn('replies_kpi lookup failed:', reErr);
+      }
 
       // Calculate 24 hours ago
       const twentyFourHoursAgo = new Date();

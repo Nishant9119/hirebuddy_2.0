@@ -83,6 +83,15 @@ interface JobsApiResponse {
 }
 
 export class DashboardService {
+  private static hasBackendToken(): boolean {
+    try {
+      if (typeof window === 'undefined') return false;
+      const token = localStorage.getItem('auth_token');
+      return !!token;
+    } catch {
+      return false;
+    }
+  }
   /**
    * Check authentication status using backend API
    */
@@ -284,8 +293,12 @@ export class DashboardService {
    */
   static async getEmailOutreachStats(): Promise<EmailOutreachStats> {
     try {
+      if (!this.hasBackendToken()) {
+        return await this.getEmailOutreachStatsFromSupabase();
+      }
+
       const response = await apiClient.getEmailUsage() as ApiResponse<EmailUsageResponse>;
-      
+
       if (response.success && response.data && typeof response.data === 'object') {
         const data = response.data;
         return {
@@ -297,51 +310,19 @@ export class DashboardService {
           response_rate: data.response_rate || 0
         };
       }
-      
-      // Fallback to Supabase: compute from useremaillog
-      const { data: userData } = await supabase.auth.getUser();
-      const currentUser = userData?.user;
-      if (!currentUser) {
-        return {
-          total_emails_sent: 0,
-          emails_this_month: 0,
-          remaining_emails: 0,
-          email_limit: 0,
-          success_rate: 0,
-          response_rate: 0
-        };
-      }
 
-      // Our useremaillog table uses user email as user_id
-      const userIdentifier = currentUser.email || currentUser.id;
-
-      // Total emails sent
-      const { count: totalSent } = await supabase
-        .from('useremaillog')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userIdentifier);
-
-      // Emails sent this month
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
-      const { count: thisMonth } = await supabase
-        .from('useremaillog')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userIdentifier)
-        .gte('sent_at', startOfMonth.toISOString());
-
-      return {
-        total_emails_sent: totalSent || 0,
-        emails_this_month: thisMonth || 0,
-        remaining_emails: 0,
-        email_limit: 0,
-        success_rate: 0,
-        response_rate: 0
-      };
+      // Non-success response: use Supabase fallback
+      return await this.getEmailOutreachStatsFromSupabase();
     } catch (error) {
-      console.error('Error fetching email stats:', error);
+      console.error('Error fetching email stats from API, using Supabase fallback:', error);
+      return await this.getEmailOutreachStatsFromSupabase();
+    }
+  }
+
+  private static async getEmailOutreachStatsFromSupabase(): Promise<EmailOutreachStats> {
+    const { data: userData } = await supabase.auth.getUser();
+    const currentUser = userData?.user;
+    if (!currentUser) {
       return {
         total_emails_sent: 0,
         emails_this_month: 0,
@@ -351,6 +332,35 @@ export class DashboardService {
         response_rate: 0
       };
     }
+
+    // Our useremaillog table uses user email as user_id
+    const userIdentifier = currentUser.email || currentUser.id;
+
+    // Total emails sent
+    const { count: totalSent } = await supabase
+      .from('useremaillog')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userIdentifier);
+
+    // Emails sent this month
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const { count: thisMonth } = await supabase
+      .from('useremaillog')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userIdentifier)
+      .gte('sent_at', startOfMonth.toISOString());
+
+    return {
+      total_emails_sent: totalSent || 0,
+      emails_this_month: thisMonth || 0,
+      remaining_emails: 0,
+      email_limit: 0,
+      success_rate: 0,
+      response_rate: 0
+    };
   }
 
   /**
