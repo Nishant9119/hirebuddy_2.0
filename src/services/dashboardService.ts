@@ -313,43 +313,68 @@ export class DashboardService {
         response_rate: 0
       };
     }
-    // Prefer total from aggregated totalemailcounttable using user_id (UUID)
-    const userId = currentUser.id;
-    const { data: countRow, error: countErr } = await supabase
-      .from('totalemailcounttable')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    let totalSent = countRow?.total_count ?? 0;
-    let emailLimit = countRow?.email_limit ?? 0;
-    let remaining = Math.max(0, (emailLimit || 0) - (totalSent || 0));
-
-    // Optionally compute this month from useremaillog if available (uses email or id)
-    const userIdentifier = currentUser.email || currentUser.id;
+    // Compute totals directly from logs for accurate, per-user stats
+    const userEmail = currentUser.email || '';
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
-    const { count: thisMonth } = await supabase
+
+    // Count initial emails from useremaillog
+    const { count: initialTotal = 0 } = await supabase
       .from('useremaillog')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', userIdentifier)
+      .eq('user_id', userEmail);
+
+    const { count: initialThisMonth = 0 } = await supabase
+      .from('useremaillog')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userEmail)
       .gte('sent_at', startOfMonth.toISOString());
 
-    // Fallback for total if totalemailcounttable is not accessible
-    if (!countRow || countErr) {
-      const { count: totalFromLog } = await supabase
-        .from('useremaillog')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userIdentifier);
-      totalSent = totalFromLog || 0;
+    // Sum follow-ups from followuplogs (followup_count may be string)
+    const { data: followupRowsAll } = await supabase
+      .from('followuplogs')
+      .select('followup_count')
+      .eq('user_id', userEmail);
+
+    const { data: followupRowsMonth } = await supabase
+      .from('followuplogs')
+      .select('followup_count, sent_at')
+      .eq('user_id', userEmail)
+      .gte('sent_at', startOfMonth.toISOString());
+
+    const sumFollowups = (rows: any[] | null | undefined) =>
+      (rows || []).reduce((sum, r) => sum + (parseInt(String(r.followup_count)) || 1), 0);
+
+    const followupsTotal = sumFollowups(followupRowsAll);
+    const followupsThisMonth = sumFollowups(followupRowsMonth);
+
+    const totalSent = (initialTotal || 0) + followupsTotal;
+    const thisMonth = (initialThisMonth || 0) + followupsThisMonth;
+
+    // Pull limit/remaining from totalemailcounttable tied to auth.uid() (UUID-as-text)
+    let emailLimit = 0;
+    let remaining = 0;
+    try {
+      const { data: countRow } = await supabase
+        .from('totalemailcounttable')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+      if (countRow) {
+        emailLimit = countRow.email_limit || 0;
+        const used = countRow.total_count || 0;
+        remaining = Math.max(0, emailLimit - used);
+      }
+    } catch (e) {
+      // Safe defaults if table not accessible
       emailLimit = 0;
       remaining = 0;
     }
 
     return {
-      total_emails_sent: totalSent || 0,
-      emails_this_month: thisMonth || 0,
+      total_emails_sent: totalSent,
+      emails_this_month: thisMonth,
       remaining_emails: remaining,
       email_limit: emailLimit,
       success_rate: 0,
@@ -382,29 +407,56 @@ export class DashboardService {
       const userEmail = currentUser.email || '';
       if (!userEmail) return 0;
 
-      // Get distinct recipients the user has emailed
-      const { data: sentRows, error: sentErr } = await supabase
+      // 24-hour threshold for follow-up eligibility
+      const twentyFourHoursAgo = new Date();
+      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+      // Load initial emails and follow-ups sent by the user
+      const { data: emailLogs } = await supabase
         .from('useremaillog')
-        .select('to')
+        .select('to, sent_at')
         .eq('user_id', userEmail)
         .not('to', 'is', null);
-      if (sentErr) return 0;
-      const uniqueSent = new Set((sentRows || []).map(r => String(r.to).toLowerCase()).filter(Boolean));
 
-      // Get distinct recipients who have replied
-      const { data: repliedRows, error: replyErr } = await supabase
+      const { data: followupLogs } = await supabase
+        .from('followuplogs')
+        .select('to, sent_at')
+        .eq('user_id', userEmail)
+        .not('to', 'is', null);
+
+      // Recipients who have replied
+      const { data: repliedRows } = await supabase
         .from('replies_kpi')
         .select('to')
         .eq('user_id', userEmail)
         .eq('reply', true)
         .not('to', 'is', null);
-      if (replyErr) return uniqueSent.size;
-      const uniqueReplied = new Set((repliedRows || []).map(r => String(r.to).toLowerCase()).filter(Boolean));
+      const repliedSet = new Set((repliedRows || []).map(r => String(r.to).toLowerCase()));
 
-      // Pending follow-ups are sent recipients without a recorded reply
+      // Determine last communication per recipient (email or follow-up)
+      const lastCommByRecipient = new Map<string, Date>();
+
+      (emailLogs || []).forEach(row => {
+        const addr = String(row.to).toLowerCase();
+        const date = new Date(row.sent_at);
+        const existing = lastCommByRecipient.get(addr);
+        if (!existing || date > existing) lastCommByRecipient.set(addr, date);
+      });
+
+      (followupLogs || []).forEach(row => {
+        const addr = String(row.to).toLowerCase();
+        const date = new Date(row.sent_at);
+        const existing = lastCommByRecipient.get(addr);
+        if (!existing || date > existing) lastCommByRecipient.set(addr, date);
+      });
+
+      // Count recipients needing follow-up: no reply yet and last comm > 24h ago
       let pending = 0;
-      uniqueSent.forEach(addr => { if (!uniqueReplied.has(addr)) pending += 1; });
-      return Math.max(0, pending);
+      for (const [addr, lastDate] of lastCommByRecipient) {
+        if (repliedSet.has(addr)) continue;
+        if (lastDate < twentyFourHoursAgo) pending += 1;
+      }
+      return pending;
     } catch (error) {
       console.error('Error fetching followups needed count:', error);
       return 0;

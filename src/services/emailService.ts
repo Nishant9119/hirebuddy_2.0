@@ -184,6 +184,26 @@ class EmailService {
 
       const data = await response.json();
       console.log('✅ Email sent successfully:', data);
+
+      // Log successful AWS email to useremaillog for accurate per-user stats
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const currentUser = userData?.user;
+        if (currentUser?.email) {
+          await supabase
+            .from('useremaillog')
+            .insert({
+              sent_at: new Date().toISOString(),
+              to: sanitizedRequest.to,
+              user_id: currentUser.email, // useremaillog uses email as user_id
+              messageId: data.messageId || `aws-${Date.now()}`,
+              threadId: data.threadId || data.messageId,
+              subject: sanitizedRequest.subject
+            });
+        }
+      } catch (logError) {
+        console.warn('Failed to log AWS email to useremaillog:', logError);
+      }
       
       // Handle different response types
       if (typeof data === 'string') {
@@ -277,6 +297,26 @@ class EmailService {
 
       const data = await response.json();
       console.log('✅ Follow-up sent successfully:', data);
+      
+      // Log follow-up to followuplogs for accurate last-communication tracking
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const currentUser = userData?.user;
+        if (currentUser?.email) {
+          await supabase
+            .from('followuplogs')
+            .insert({
+              sent_at: new Date().toISOString(),
+              to: sanitizedRequest.to,
+              user_id: currentUser.email, // followuplogs uses email as user_id
+              followup_count: '1',
+              subject: sanitizedRequest.subject || null,
+              body: sanitizedRequest.body || null
+            });
+        }
+      } catch (logError) {
+        console.warn('Failed to log follow-up to followuplogs:', logError);
+      }
       return data;
     } catch (error) {
       console.error('❌ Error sending follow-up:', error);
