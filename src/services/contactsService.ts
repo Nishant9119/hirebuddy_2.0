@@ -408,7 +408,7 @@ class ContactsService {
       }
 
       console.log('Contacts needing follow-up (24+ hours since last communication):', contactsNeedingFollowup.length);
-      console.log('Contacts who replied (excluded from follow-up):', contactsWhoReplied.length);
+      console.log('Contacts who replied (excluded from follow-up):', repliedContactsSet.size);
       console.log('24 hours ago cutoff:', twentyFourHoursAgo.toISOString());
 
       // Sort by last communication date (oldest first, as these need follow-up most urgently)
