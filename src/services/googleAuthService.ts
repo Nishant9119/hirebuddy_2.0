@@ -249,6 +249,8 @@ class GoogleAuthService {
           'https://www.googleapis.com/auth/gmail.addons.current.message.readonly',
           'https://www.googleapis.com/auth/userinfo.email',
           'https://www.googleapis.com/auth/userinfo.profile',
+          'https://www.googleapis.com/auth/contacts.readonly'
+
         ];
         
         const tokenScopes = tokenInfo.scope ? tokenInfo.scope.split(' ') : [];
