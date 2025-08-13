@@ -130,6 +130,9 @@ const AWSEmailComposer = ({
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Toggle between formatted HTML view and source editing
+  const [showFormattedView, setShowFormattedView] = useState(true);
+
   // Initialize sender email from authenticated user
   useEffect(() => {
     if (user?.email) {
@@ -653,6 +656,11 @@ const AWSEmailComposer = ({
         body: aiResponse.body
       }));
 
+      // If the generated body looks like HTML, default to formatted view
+      if (/<\w+[^>]*>/.test(aiResponse.body)) {
+        setShowFormattedView(true);
+      }
+
       toast({
         title: "AI Email Generated",
         description: "Email content has been generated successfully. Review and edit as needed.",
@@ -1028,6 +1036,14 @@ const AWSEmailComposer = ({
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => setShowFormattedView(v => !v)}
+                      className="flex items-center gap-2"
+                    >
+                      {showFormattedView ? 'Show Source' : 'Show Formatted'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={generateAIEmail}
                       disabled={selectedContacts.length === 0 || isGeneratingAI}
                       className="flex items-center gap-2 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 hover:from-purple-100 hover:to-blue-100"
@@ -1041,13 +1057,22 @@ const AWSEmailComposer = ({
                     </Button>
                   </div>
                 </div>
-                <Textarea
-                  id="body"
-                  placeholder="Write your email content here... or use AI generation to create personalized content based on your profile and the selected contact."
-                  className="min-h-[300px]"
-                  value={emailData.body}
-                  onChange={(e) => setEmailData(prev => ({ ...prev, body: e.target.value }))}
-                />
+                {showFormattedView && emailData.body ? (
+                  <div className="min-h-[300px] p-4 bg-white border rounded-md">
+                    <div
+                      className="prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: emailService.getFormattedEmailContent(emailData.body, true) }}
+                    />
+                  </div>
+                ) : (
+                  <Textarea
+                    id="body"
+                    placeholder="Write your email content here... or use AI generation to create personalized content based on your profile and the selected contact."
+                    className="min-h-[300px]"
+                    value={emailData.body}
+                    onChange={(e) => setEmailData(prev => ({ ...prev, body: e.target.value }))}
+                  />
+                )}
                 {isGeneratingAI && (
                   <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 p-2 rounded">
                     <Sparkles className="h-4 w-4 animate-pulse" />
