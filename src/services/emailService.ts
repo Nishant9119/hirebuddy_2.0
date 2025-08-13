@@ -1162,12 +1162,38 @@ Email: kulshreshthasarv@gmail.com`
     if (!useHtml) {
       return this.formatAsPlainText(plainTextBody);
     }
-    // If body already appears to be HTML, passthrough to avoid double-formatting
     const looksLikeHtml = /<\s*(p|br|div|ul|ol|li|a|strong|em|span|table|h[1-6])\b/i.test(plainTextBody);
     if (looksLikeHtml) {
-      return plainTextBody.trim();
+      return this.wrapHtmlEmail(plainTextBody);
     }
     return this.formatAsHtml(plainTextBody);
+  }
+
+  /**
+   * Sanitize and normalize existing HTML (strip scripts/styles, bold/italics per prompt, normalize breaks)
+   */
+  private sanitizeAndNormalizeHtml(html: string): string {
+    let result = (html || '').trim();
+    // Remove script and style blocks completely
+    result = result.replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
+    // Remove bold/italic tags but keep inner text (prompt requires no bold/italics)
+    result = result.replace(/<\/?(b|strong|em|i)\b[^>]*>/gi, '');
+    // Normalize <br> variations
+    result = result.replace(/<br\s*\/?\s*>/gi, '<br>');
+    return result;
+  }
+
+  /**
+   * Wrap provided HTML inside a styled email container after sanitizing/normalizing
+   */
+  private wrapHtmlEmail(innerHtml: string): string {
+    const safeInner = this.sanitizeAndNormalizeHtml(innerHtml);
+    const emailBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; max-width: 600px; margin: 0; padding: 0;">
+        ${safeInner}
+      </div>
+    `.trim();
+    return emailBody;
   }
 
   /**
