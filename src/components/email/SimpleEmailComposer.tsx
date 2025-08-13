@@ -532,11 +532,9 @@ const SimpleEmailComposer: React.FC<SimpleEmailComposerProps> = ({
                     <div>
                       <strong>Message:</strong>
                       <div className="mt-2 p-3 bg-white border rounded-md">
-                        {isHtml ? (
-                          <div dangerouslySetInnerHTML={{ __html: body }} />
-                        ) : (
-                          <div className="whitespace-pre-wrap">{body}</div>
-                        )}
+                        <div
+                          dangerouslySetInnerHTML={{ __html: emailService.getFormattedEmailContent(body) }}
+                        />
                       </div>
                     </div>
                   </div>

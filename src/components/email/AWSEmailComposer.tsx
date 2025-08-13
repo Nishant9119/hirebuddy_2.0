@@ -1054,6 +1054,19 @@ const AWSEmailComposer = ({
                     AI is generating personalized email content based on your profile and contact information...
                   </div>
                 )}
+                {emailData.body && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-blue-100 px-4 py-2 text-sm font-medium text-blue-800 border-b">
+                      Formatted Email (as it will be sent)
+                    </div>
+                    <div className="p-4 bg-white">
+                      <div
+                        className="prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: emailService.getFormattedEmailContent(emailData.body) }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Separator />
