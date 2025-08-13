@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import { JobFilters as JobFiltersType } from "@/pages/Jobs";
+import { JobFilters as JobFiltersType } from "@/types/job";
 import { Filter, DollarSign, Clock, MapPin, Building } from "lucide-react";
 import { useState } from "react";
 

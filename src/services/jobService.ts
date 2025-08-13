@@ -1,6 +1,8 @@
 import { Job, JobSearchParams } from '../types/job';
 import { apiClient, ApiResponse } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import { LocationService } from './locationService';
+import { SearchService, EnhancedSearchParams } from './searchService';
 
 // Define API response types for proper type safety
 interface JobsApiResponse {
@@ -117,70 +119,133 @@ export class JobService {
     return tags.slice(0, 3); // Limit to 3 tags
   }
 
-  // Get all jobs with optional search and filtering - NOW USING API
+  // Get all jobs with enhanced search and filtering
   static async getJobs(params: JobSearchParams = {}): Promise<{ jobs: Job[]; total: number }> {
     try {
       console.log('JobService.getJobs called with params:', params);
       
-      // Convert params to API format
-      const apiParams: Record<string, string> = {};
-      
-      if (params.query) apiParams.query = params.query;
-      if (params.sortBy) apiParams.sortBy = params.sortBy;
-      if (params.sortOrder) apiParams.sortOrder = params.sortOrder;
-      if (params.limit) apiParams.limit = params.limit.toString();
-      if (params.offset) apiParams.offset = params.offset.toString();
-      
-      // Add filters as individual params
-      if (params.filters) {
-        if (params.filters.location) apiParams.location = params.filters.location;
-        if (params.filters.experience && params.filters.experience !== 'any') {
-          apiParams.experience = params.filters.experience;
+      // Try API first
+      try {
+        const apiParams: Record<string, string> = {};
+        
+        if (params.query) apiParams.query = params.query;
+        if (params.sortBy) apiParams.sortBy = params.sortBy;
+        if (params.sortOrder) apiParams.sortOrder = params.sortOrder;
+        if (params.limit) apiParams.limit = params.limit.toString();
+        if (params.offset) apiParams.offset = params.offset.toString();
+        
+        // Add filters as individual params
+        if (params.filters) {
+          if (params.filters.location) apiParams.location = params.filters.location;
+          if (params.filters.experience && params.filters.experience !== 'any') {
+            apiParams.experience = params.filters.experience;
+          }
+          if (params.filters.remote && params.filters.remote !== 'all') {
+            apiParams.remote = params.filters.remote;
+          }
+          if (params.filters.company) apiParams.company = params.filters.company;
         }
-        if (params.filters.remote && params.filters.remote !== 'all') {
-          apiParams.remote = params.filters.remote;
-        }
-        if (params.filters.company) apiParams.company = params.filters.company;
-      }
 
-      const response = await apiClient.getJobs(apiParams) as ApiResponse<JobsApiResponse>;
+        const response = await apiClient.getJobs(apiParams) as ApiResponse<JobsApiResponse>;
 
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch jobs');
-      }
-
-      console.log(`JobService: Fetched ${response.data?.jobs?.length || 0} jobs out of ${response.data?.pagination?.total || 0} total`);
-      
-      const jobs = (response.data?.jobs || []).map(job => {
-        try {
-          return this.transformDatabaseJob(job);
-        } catch (transformError) {
-          console.error('Error transforming job:', job.job_id, transformError);
-          // Return a basic job object if transformation fails
-          const fallbackLogo = this.generateFallbackLogo(job.company_name || 'Unknown Company');
+        if (response.success) {
+          const jobs = (response.data?.jobs || []).map(job => this.transformDatabaseJob(job));
           return {
-            id: job.job_id,
-            title: job.job_title || 'Untitled Position',
-            company: job.company_name || 'Unknown Company',
-            location: job.job_location || 'Location not specified',
-            description: job.job_description || 'No description available',
-            isRemote: job.remote_flag || false,
-            isProbablyRemote: job.probably_remote || false,
-            createdAt: job.created_at,
-            posted: 'Recently',
-            logo: fallbackLogo,
-            tags: ['Job'],
-            type: 'Full-time'
+            jobs,
+            total: response.data?.pagination?.total || 0
           };
         }
-      });
+      } catch (apiError) {
+        console.warn('API failed, falling back to direct database query:', apiError);
+      }
+
+      // Fallback to direct database query with enhanced filtering
+      let query = supabase
+        .from('hirebuddy_job_board')
+        .select('*');
+
+      // Apply filters at database level
+      if (params.filters) {
+        if (params.filters.location && params.filters.location.trim()) {
+          const normalizedLocation = LocationService.normalizeLocation(params.filters.location);
+          const locationVariations = LocationService.getLocationVariations(normalizedLocation);
+          query = query.or(locationVariations.map(loc => `job_location.ilike.%${loc}%`).join(','));
+        }
+        
+        if (params.filters.experience && params.filters.experience !== 'any') {
+          query = query.ilike('experience_required', `%${params.filters.experience}%`);
+        }
+        
+        if (params.filters.remote && params.filters.remote !== 'all') {
+          if (params.filters.remote === 'remote') {
+            query = query.or('remote_flag.eq.true,probably_remote.eq.true');
+          } else {
+            query = query.eq('remote_flag', false).eq('probably_remote', false);
+          }
+        }
+        
+        if (params.filters.company && params.filters.company.trim()) {
+          query = query.ilike('company_name', `%${params.filters.company}%`);
+        }
+      }
+
+      // Apply text search
+      if (params.query && params.query.trim()) {
+        const searchTerms = params.query.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+        const searchConditions = searchTerms.map(term => 
+          `job_title.ilike.%${term}%,company_name.ilike.%${term}%,job_description.ilike.%${term}%`
+        ).join(',');
+        query = query.or(searchConditions);
+      }
+
+      // Apply sorting
+      if (params.sortBy) {
+        const order = params.sortOrder === 'asc' ? { ascending: true } : { ascending: false };
+        query = query.order(params.sortBy, order);
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      // Apply pagination
+      if (params.limit) {
+        query = query.limit(params.limit);
+      }
+      if (params.offset) {
+        query = query.range(params.offset, params.offset + (params.limit || 20) - 1);
+      }
+
+      const { data: dbJobs, error: dbError, count } = await query;
+
+      if (dbError) {
+        console.error('Error fetching jobs from database:', dbError);
+        throw dbError;
+      }
+
+      const jobs = (dbJobs || []).map(job => this.transformDatabaseJob(job));
       
+      // Apply client-side enhanced search for better relevance
+      if (params.query || (params.filters && Object.values(params.filters).some(v => v && v !== 'all' && v !== 'any'))) {
+        const enhancedParams: EnhancedSearchParams = {
+          ...params,
+          boostRecent: true,
+          boostRemote: true,
+          boostExperience: true,
+          fuzzySearch: true
+        };
+
+        const searchResult = await SearchService.searchJobs(jobs, enhancedParams);
+        return {
+          jobs: searchResult.jobs,
+          total: searchResult.total
+        };
+      }
+
       return {
         jobs,
-        total: response.data?.pagination?.total || 0
+        total: count || jobs.length
       };
     } catch (error) {
-      console.error('Error fetching jobs from API:', error);
+      console.error('Error in enhanced job search:', error);
       // Return mock data as fallback
       return this.getMockJobs(params);
     }
@@ -633,18 +698,24 @@ export class JobService {
     }
   }
 
-  // Search for locations (for autocomplete)
+  // Search for locations (for autocomplete) - Enhanced with LocationService
   static async searchLocations(query: string, limit: number = 10): Promise<string[]> {
     try {
+      // First try API
       const response = await apiClient.searchLocations(query, limit);
 
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to search locations');
+      if (response.success && Array.isArray(response.data)) {
+        return response.data;
       }
-
-      return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
-      console.error('Error searching locations:', error);
+      console.warn('API location search failed, using LocationService:', error);
+    }
+
+    // Fallback to LocationService for better location handling
+    try {
+      return LocationService.searchLocations(query, limit);
+    } catch (error) {
+      console.error('Error searching locations with LocationService:', error);
       return [];
     }
   }

@@ -69,6 +69,8 @@ import MobileButton from "@/components/mobile/MobileButton";
 import MobileSearchBar from "@/components/mobile/MobileSearchBar";
 import MobileJobCard from "@/components/mobile/MobileJobCard";
 import { JobRankingService } from "@/services/jobRankingService";
+import { EnhancedJobSearch } from "@/components/jobs/EnhancedJobSearch";
+import { EnhancedJobFilters } from "@/components/jobs/EnhancedJobFilters";
 
 const Jobs = () => {
   // Auth and user state
@@ -527,17 +529,17 @@ const Jobs = () => {
 
                 {/* Mobile Search Bar */}
                 <div className="md:hidden">
-                  <MobileSearchBar
-                    value={searchQuery}
-                    onChange={setSearchQuery}
+                  <EnhancedJobSearch
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    onSearch={() => {}}
+                    jobs={allJobs}
                     placeholder="Search jobs, companies, skills..."
-                    onFilter={() => setShowFilters(!showFilters)}
-                    filterCount={activeFilterCount}
-                    className="border-0 p-0 bg-transparent"
+                    className="w-full"
                   />
                 </div>
 
-                {/* Desktop Search Bar */}
+                {/* Desktop Search and Filters */}
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -545,23 +547,14 @@ const Jobs = () => {
                   className="hidden md:flex items-center gap-4"
                 >
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <Input
+                    <EnhancedJobSearch
+                      searchQuery={searchQuery}
+                      setSearchQuery={setSearchQuery}
+                      onSearch={() => {}}
+                      jobs={allJobs}
                       placeholder="Search jobs, companies, skills, or locations..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 pr-4 h-11 text-base border-2 border-gray-200 focus:border-blue-500 transition-colors"
+                      className="w-full"
                     />
-                    {searchQuery && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSearchQuery("")}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
                   </div>
                   
                   <Button

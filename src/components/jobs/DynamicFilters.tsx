@@ -22,7 +22,7 @@ import {
   Settings
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { JobFilters } from "@/pages/Jobs";
+import { JobFilters } from "@/types/job";
 
 interface DynamicFiltersProps {
   filters: JobFilters;
