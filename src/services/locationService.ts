@@ -127,7 +127,7 @@ export class LocationService {
           return;
         }
         
-        // Contains
+        // Contains (letter-by-letter allowed)
         if (nameLower.includes(searchTerm)) {
           results.add(primary);
           return;
@@ -245,5 +245,34 @@ export class LocationService {
     return Object.entries(locationCounts)
       .map(([location, count]) => ({ location, count }))
       .sort((a, b) => b.count - a.count);
+  }
+
+  // Find similar primary locations for a possibly misspelled query
+  static getSimilarPrimaryLocations(query: string, limit: number = 5, threshold: number = 0.6): string[] {
+    if (!query || !query.trim()) return [];
+    const q = query.trim().toLowerCase();
+
+    const scored: Array<{ primary: string; score: number }> = [];
+
+    Object.entries(LocationService.locationMappings).forEach(([primary, variations]) => {
+      const primaryLower = primary.toLowerCase();
+      const primaryScore = LocationService.calculateSimilarity(primaryLower, q);
+      let bestScore = primaryScore;
+
+      for (const variation of variations) {
+        const variationLower = variation.toLowerCase();
+        const variationScore = LocationService.calculateSimilarity(variationLower, q);
+        if (variationScore > bestScore) bestScore = variationScore;
+      }
+
+      if (bestScore >= threshold) {
+        scored.push({ primary, score: bestScore });
+      }
+    });
+
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(s => s.primary);
   }
 }

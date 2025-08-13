@@ -205,7 +205,12 @@ export const EnhancedJobFilters = ({
               <Input
                 placeholder="Search locations..."
                 value={locationQuery}
-                onChange={(e) => setLocationQuery(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setLocationQuery(value);
+                  // Keep filters in sync so results update as user types
+                  setFilters({ ...filters, location: value });
+                }}
                 onFocus={() => setShowLocationSuggestions(true)}
                 className="pr-8"
               />
@@ -213,7 +218,10 @@ export const EnhancedJobFilters = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setLocationQuery("")}
+                  onClick={() => {
+                    setLocationQuery("");
+                    setFilters({ ...filters, location: "" });
+                  }}
                   className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
                 >
                   <X className="w-3 h-3" />

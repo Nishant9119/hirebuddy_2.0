@@ -123,40 +123,59 @@ export class JobService {
   static async getJobs(params: JobSearchParams = {}): Promise<{ jobs: Job[]; total: number }> {
     try {
       console.log('JobService.getJobs called with params:', params);
+      const hasLocationFilter = !!(params.filters && params.filters.location && params.filters.location.trim());
       
-      // Try API first
-      try {
-        const apiParams: Record<string, string> = {};
-        
-        if (params.query) apiParams.query = params.query;
-        if (params.sortBy) apiParams.sortBy = params.sortBy;
-        if (params.sortOrder) apiParams.sortOrder = params.sortOrder;
-        if (params.limit) apiParams.limit = params.limit.toString();
-        if (params.offset) apiParams.offset = params.offset.toString();
-        
-        // Add filters as individual params
-        if (params.filters) {
-          if (params.filters.location) apiParams.location = params.filters.location;
-          if (params.filters.experience && params.filters.experience !== 'any') {
-            apiParams.experience = params.filters.experience;
+      // Try API first unless a location filter is applied (server may not handle variations/partials reliably)
+      if (!hasLocationFilter) {
+        try {
+          const apiParams: Record<string, string> = {};
+          
+          if (params.query) apiParams.query = params.query;
+          if (params.sortBy) apiParams.sortBy = params.sortBy;
+          if (params.sortOrder) apiParams.sortOrder = params.sortOrder;
+          if (params.limit) apiParams.limit = params.limit.toString();
+          if (params.offset) apiParams.offset = params.offset.toString();
+          
+          // Add filters as individual params
+          if (params.filters) {
+            if (params.filters.location) apiParams.location = params.filters.location;
+            if (params.filters.experience && params.filters.experience !== 'any') {
+              apiParams.experience = params.filters.experience;
+            }
+            if (params.filters.remote && params.filters.remote !== 'all') {
+              apiParams.remote = params.filters.remote;
+            }
+            if (params.filters.company) apiParams.company = params.filters.company;
           }
-          if (params.filters.remote && params.filters.remote !== 'all') {
-            apiParams.remote = params.filters.remote;
+
+          const response = await apiClient.getJobs(apiParams) as ApiResponse<JobsApiResponse>;
+
+          if (response.success) {
+            const jobs = (response.data?.jobs || []).map(job => this.transformDatabaseJob(job));
+            // Apply client-side enhanced search to ensure partial/variation location matching
+            if (params.query || (params.filters && Object.values(params.filters).some(v => v && v !== 'all' && v !== 'any'))) {
+              const enhancedParams: EnhancedSearchParams = {
+                ...params,
+                boostRecent: true,
+                boostRemote: true,
+                boostExperience: true,
+                fuzzySearch: true
+              };
+              const searchResult = await SearchService.searchJobs(jobs, enhancedParams);
+              return {
+                jobs: searchResult.jobs,
+                total: searchResult.total
+              };
+            }
+
+            return {
+              jobs,
+              total: response.data?.pagination?.total || 0
+            };
           }
-          if (params.filters.company) apiParams.company = params.filters.company;
+        } catch (apiError) {
+          console.warn('API failed, falling back to direct database query:', apiError);
         }
-
-        const response = await apiClient.getJobs(apiParams) as ApiResponse<JobsApiResponse>;
-
-        if (response.success) {
-          const jobs = (response.data?.jobs || []).map(job => this.transformDatabaseJob(job));
-          return {
-            jobs,
-            total: response.data?.pagination?.total || 0
-          };
-        }
-      } catch (apiError) {
-        console.warn('API failed, falling back to direct database query:', apiError);
       }
 
       // Fallback to direct database query with enhanced filtering
@@ -167,9 +186,31 @@ export class JobService {
       // Apply filters at database level
       if (params.filters) {
         if (params.filters.location && params.filters.location.trim()) {
-          const normalizedLocation = LocationService.normalizeLocation(params.filters.location);
-          const locationVariations = LocationService.getLocationVariations(normalizedLocation);
-          query = query.or(locationVariations.map(loc => `job_location.ilike.%${loc}%`).join(','));
+          const raw = params.filters.location.trim();
+          const normalizedLocation = LocationService.normalizeLocation(raw);
+          const locationVariations = Array.from(
+            new Set([
+              ...LocationService.getLocationVariations(normalizedLocation),
+              ...LocationService.getSimilarPrimaryLocations(raw, 5, 0.55)
+            ])
+          );
+
+          const terms = Array.from(
+            new Set([
+              raw,
+              normalizedLocation,
+              ...locationVariations
+            ])
+          );
+
+          const locationOrConditions = terms
+            .flatMap(loc => [
+              `job_location.ilike.%${loc}%`,
+              `city.ilike.%${loc}%`,
+              `state.ilike.%${loc}%`
+            ])
+            .join(',');
+          query = query.or(locationOrConditions);
         }
         
         if (params.filters.experience && params.filters.experience !== 'any') {
@@ -192,8 +233,16 @@ export class JobService {
       // Apply text search
       if (params.query && params.query.trim()) {
         const searchTerms = params.query.toLowerCase().split(/\s+/).filter(term => term.length > 0);
-        const searchConditions = searchTerms.map(term => 
-          `job_title.ilike.%${term}%,company_name.ilike.%${term}%,job_description.ilike.%${term}%`
+        const searchConditions = searchTerms.map(term =>
+          [
+            `job_title.ilike.%${term}%`,
+            `company_name.ilike.%${term}%`,
+            `job_description.ilike.%${term}%`,
+            // Include location-related fields to support location search directly from the main query
+            `job_location.ilike.%${term}%`,
+            `city.ilike.%${term}%`,
+            `state.ilike.%${term}%`
+          ].join(',')
         ).join(',');
         query = query.or(searchConditions);
       }

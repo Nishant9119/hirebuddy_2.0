@@ -109,7 +109,10 @@ export class SearchService {
     if (!query.trim()) return jobs;
 
     const queryLower = query.toLowerCase();
-    const searchTerms = queryLower.split(/\s+/).filter(term => term.length > 0);
+    const searchTerms = queryLower
+      .split(/\s+/)
+      .flatMap(term => term.split(/[-_,]/))
+      .filter(term => term.length > 0);
 
     return jobs.filter(job => {
       const searchableText = [
@@ -118,18 +121,19 @@ export class SearchService {
         job.description || '',
         job.location || '',
         job.tags?.join(' ') || ''
-      ].join(' ').toLowerCase();
+      ]
+        .join(' ')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/\s*[,|-]\s*/g, ' '); // normalize separators and multiple spaces
 
       // Check for exact matches first
       if (searchableText.includes(queryLower)) {
         return true;
       }
 
-      // Check for partial matches
-      const hasPartialMatch = searchTerms.some(term => {
-        if (term.length < 2) return false;
-        return searchableText.includes(term);
-      });
+      // Check for partial matches (letter-by-letter allowed)
+      const hasPartialMatch = searchTerms.some(term => searchableText.includes(term));
 
       if (hasPartialMatch) {
         return true;
@@ -138,17 +142,17 @@ export class SearchService {
       // Fuzzy search for typos and similar terms
       if (fuzzySearch) {
         const hasFuzzyMatch = searchTerms.some(term => {
-          if (term.length < 3) return false;
+          if (term.length < 1) return false;
           
           // Check each searchable field for fuzzy matches
           const fields = [job.title, job.company, job.location];
           return fields.some(field => {
             if (!field) return false;
-            const fieldLower = field.toLowerCase();
+            const fieldLower = field.toLowerCase().replace(/\s*[,|-]\s*/g, ' ');
             const words = fieldLower.split(/\s+/);
             
             return words.some(word => {
-              if (word.length < 3) return false;
+              if (word.length < 1) return false;
               const similarity = this.calculateSimilarity(word, term);
               return similarity > 0.7; // 70% similarity threshold
             });
