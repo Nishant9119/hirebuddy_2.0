@@ -27,6 +27,7 @@ export const EnhancedJobSearch = ({
   const [trendingTerms, setTrendingTerms] = useState<string[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const searchInputRef = useRef<HTMLDivElement>(null);
 
   // Load recent searches from localStorage
@@ -54,21 +55,24 @@ export const EnhancedJobSearch = ({
     loadTrendingTerms();
   }, [jobs]);
 
-  // Generate suggestions when search query changes
+  // Generate suggestions when search query changes with faster response
   useEffect(() => {
     const generateSuggestions = async () => {
       if (!searchQuery.trim()) {
         setSuggestions([]);
         setShowSuggestions(false);
+        setIsLoading(false);
         return;
       }
 
+      setIsLoading(true);
+
       try {
-        // Get search suggestions
-        const searchSuggestions = await SearchService.getSearchSuggestions(jobs, searchQuery, 5);
+        // Get search suggestions with reduced debounce for faster response
+        const searchSuggestions = await SearchService.getSearchSuggestions(jobs, searchQuery, 6);
         
-        // Get location suggestions
-        const locationSuggestions = await LocationService.searchLocations(searchQuery, 5);
+        // Get location suggestions with enhanced recommendations
+        const locationSuggestions = LocationService.getLocationRecommendations(searchQuery, 4);
         
         // Combine and deduplicate suggestions
         const allSuggestions = Array.from(new Set([...searchSuggestions, ...locationSuggestions]));
@@ -77,10 +81,13 @@ export const EnhancedJobSearch = ({
       } catch (error) {
         console.error('Error generating suggestions:', error);
         setSuggestions([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    const debounceTimer = setTimeout(generateSuggestions, 300);
+    // Reduced debounce time for faster response
+    const debounceTimer = setTimeout(generateSuggestions, 200);
     return () => clearTimeout(debounceTimer);
   }, [searchQuery, jobs]);
 
@@ -145,7 +152,7 @@ export const EnhancedJobSearch = ({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyPress={handleKeyPress}
-          onFocus={() => searchQuery && setShowSuggestions(true)}
+          onFocus={() => (searchQuery || recentSearches.length > 0 || trendingTerms.length > 0) && setShowSuggestions(true)}
           className="pl-10 pr-10 h-11 text-base border-2 border-gray-200 focus:border-blue-500 transition-colors"
         />
         {searchQuery && (
@@ -157,6 +164,11 @@ export const EnhancedJobSearch = ({
           >
             <X className="w-4 h-4" />
           </Button>
+        )}
+        {isLoading && (
+          <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+          </div>
         )}
       </div>
 
@@ -227,9 +239,16 @@ export const EnhancedJobSearch = ({
             </div>
           )}
 
-          {!recentSearches.length && !trendingTerms.length && !suggestions.length && (
+          {!recentSearches.length && !trendingTerms.length && !suggestions.length && !isLoading && (
             <div className="px-3 py-4 text-sm text-gray-500 text-center">
               No suggestions available
+            </div>
+          )}
+
+          {isLoading && (
+            <div className="px-3 py-4 text-sm text-gray-500 text-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mx-auto"></div>
+              <span className="ml-2">Finding suggestions...</span>
             </div>
           )}
         </div>

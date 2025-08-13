@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { JobFilters as JobFiltersType } from "@/types/job";
 import { Filter, X, MapPin, Clock, Building } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { LocationService } from "@/services/locationService";
 import { SearchService } from "@/services/searchService";
 import { Job } from "@/types/job";
@@ -29,14 +29,34 @@ export const EnhancedJobFilters = ({
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [isLocationLoading, setIsLocationLoading] = useState(false);
+  const [isCompanyLoading, setIsCompanyLoading] = useState(false);
   const locationInputRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLDivElement>(null);
 
-  // Popular locations for quick selection
-  const popularLocations = [
-    "Bangalore", "Mumbai", "Delhi", "Hyderabad", "Chennai", 
-    "Pune", "Gurgaon", "Noida", "Remote"
-  ];
+  // Get location statistics from jobs for better recommendations
+  const [locationStats, setLocationStats] = useState<{ location: string; count: number }[]>([]);
+
+  useEffect(() => {
+    const stats = LocationService.getLocationStats(jobs);
+    setLocationStats(stats);
+  }, [jobs]);
+
+  // Popular locations for quick selection (dynamic based on job data)
+  const popularLocations = useMemo(() => {
+    const topLocations = locationStats.slice(0, 8).map(stat => stat.location);
+    const defaultLocations = ["Bangalore", "Mumbai", "Delhi", "Hyderabad", "Chennai", "Remote"];
+    
+    // Combine and deduplicate
+    const combined = [...topLocations];
+    defaultLocations.forEach(loc => {
+      if (!combined.includes(loc)) {
+        combined.push(loc);
+      }
+    });
+    
+    return combined.slice(0, 10);
+  }, [locationStats]);
 
   // Work mode options
   const workModeOptions = [
@@ -55,37 +75,47 @@ export const EnhancedJobFilters = ({
     { value: "intern", label: "Internship" }
   ];
 
-  // Generate location suggestions
+  // Generate location suggestions with faster response
   useEffect(() => {
     const generateLocationSuggestions = async () => {
       if (!locationQuery.trim()) {
         setLocationSuggestions([]);
         setShowLocationSuggestions(false);
+        setIsLocationLoading(false);
         return;
       }
 
+      setIsLocationLoading(true);
+
       try {
-        const suggestions = await LocationService.searchLocations(locationQuery, 8);
+        // Use enhanced location recommendations
+        const suggestions = LocationService.getLocationRecommendations(locationQuery, 8);
         setLocationSuggestions(suggestions);
         setShowLocationSuggestions(true);
       } catch (error) {
         console.error('Error generating location suggestions:', error);
         setLocationSuggestions([]);
+      } finally {
+        setIsLocationLoading(false);
       }
     };
 
-    const debounceTimer = setTimeout(generateLocationSuggestions, 300);
+    // Faster debounce for better responsiveness
+    const debounceTimer = setTimeout(generateLocationSuggestions, 150);
     return () => clearTimeout(debounceTimer);
   }, [locationQuery]);
 
-  // Generate company suggestions
+  // Generate company suggestions with faster response
   useEffect(() => {
     const generateCompanySuggestions = async () => {
       if (!filters.company.trim()) {
         setSearchSuggestions([]);
         setShowSearchSuggestions(false);
+        setIsCompanyLoading(false);
         return;
       }
+
+      setIsCompanyLoading(true);
 
       try {
         const suggestions = await SearchService.getSearchSuggestions(jobs, filters.company, 8);
@@ -94,10 +124,13 @@ export const EnhancedJobFilters = ({
       } catch (error) {
         console.error('Error generating company suggestions:', error);
         setSearchSuggestions([]);
+      } finally {
+        setIsCompanyLoading(false);
       }
     };
 
-    const debounceTimer = setTimeout(generateCompanySuggestions, 300);
+    // Faster debounce for better responsiveness
+    const debounceTimer = setTimeout(generateCompanySuggestions, 150);
     return () => clearTimeout(debounceTimer);
   }, [filters.company, jobs]);
 
@@ -173,6 +206,7 @@ export const EnhancedJobFilters = ({
                 placeholder="Search locations..."
                 value={locationQuery}
                 onChange={(e) => setLocationQuery(e.target.value)}
+                onFocus={() => setShowLocationSuggestions(true)}
                 className="pr-8"
               />
               {locationQuery && (
@@ -184,6 +218,11 @@ export const EnhancedJobFilters = ({
                 >
                   <X className="w-3 h-3" />
                 </Button>
+              )}
+              {isLocationLoading && (
+                <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-500"></div>
+                </div>
               )}
             </div>
 
@@ -199,6 +238,14 @@ export const EnhancedJobFilters = ({
                     {location}
                   </div>
                 ))}
+                {locationSuggestions.length === 0 && !isLocationLoading && (
+                  <div className="px-3 py-2 text-sm text-gray-500">No locations found</div>
+                )}
+                {isLocationLoading && (
+                  <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-500 mx-auto"></div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -275,6 +322,7 @@ export const EnhancedJobFilters = ({
                 placeholder="Search companies..."
                 value={filters.company}
                 onChange={(e) => setFilters({ ...filters, company: e.target.value })}
+                onFocus={() => setShowSearchSuggestions(true)}
                 className="pr-8"
               />
               {filters.company && (
@@ -286,6 +334,11 @@ export const EnhancedJobFilters = ({
                 >
                   <X className="w-3 h-3" />
                 </Button>
+              )}
+              {isCompanyLoading && (
+                <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-500"></div>
+                </div>
               )}
             </div>
 
@@ -301,6 +354,14 @@ export const EnhancedJobFilters = ({
                     {suggestion}
                   </div>
                 ))}
+                {searchSuggestions.length === 0 && !isCompanyLoading && (
+                  <div className="px-3 py-2 text-sm text-gray-500">No companies found</div>
+                )}
+                {isCompanyLoading && (
+                  <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-500 mx-auto"></div>
+                  </div>
+                )}
               </div>
             )}
           </div>
