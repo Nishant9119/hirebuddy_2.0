@@ -15,7 +15,7 @@ const EmailPreview: React.FC<EmailPreviewProps> = ({
   body, 
   children 
 }) => {
-  const formattedHtml = emailService.getFormattedEmailContent(body);
+  const formattedHtml = emailService.formatAsHtml(body);
   const formattedPlainText = emailService.formatAsPlainText(body);
 
   return (
