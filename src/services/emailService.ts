@@ -536,8 +536,8 @@ class EmailService {
    */
   async generateAIEmail(request: AIEmailGenerationRequest): Promise<AIEmailResponse> {
     try {
-      const systemPrompt = this.buildSystemPrompt(request.emailType, request.tone || 'professional');
-      const userPrompt = this.buildUserPrompt(request);
+      // Use Python-style prompt provided by product requirements for outreach emails
+      const userPrompt = this.buildPythonStyleEmailPrompt(request);
 
               // Get current session for authentication
         const { data: { session } } = await supabase.auth.getSession();
@@ -556,10 +556,10 @@ class EmailService {
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
           ],
-          temperature: 0.7,
+          // Match Python example determinism for reproducibility
+          temperature: 0,
           max_tokens: 1500,
         }),
       });
@@ -876,13 +876,15 @@ Remember to respond in the exact JSON format specified in the system prompt.`;
       
       const parsed = JSON.parse(jsonString);
       
-      if (!parsed.subject || !parsed.body) {
+      // Accept either {subject, body} or {subject, email_body}
+      const bodyField = parsed.body || parsed.email_body;
+      if (!parsed.subject || !bodyField) {
         throw new Error('Invalid AI response format');
       }
 
       return {
         subject: parsed.subject,
-        body: parsed.body,
+        body: bodyField,
         reasoning: parsed.reasoning || ''
       };
     } catch (error) {
@@ -904,6 +906,78 @@ Remember to respond in the exact JSON format specified in the system prompt.`;
         reasoning: 'AI response parsing failed, using fallback format'
       };
     }
+  }
+
+  /**
+   * Build Python-style prompt for email generation matching provided spec
+   */
+  private buildPythonStyleEmailPrompt(request: AIEmailGenerationRequest): string {
+    const { contact, userProfile } = request;
+
+    const recruiterName = contact.name || 'there';
+    const companyName = contact.company || '';
+
+    // Build a resume-like plain text block from available profile data
+    const parts: string[] = [];
+    if (userProfile.full_name) parts.push(`Name: ${userProfile.full_name}`);
+    if (userProfile.college) parts.push(`College: ${userProfile.college}`);
+    if (userProfile.title) parts.push(`Title: ${userProfile.title}`);
+    if (userProfile.company) parts.push(`Current Company: ${userProfile.company}`);
+    if (userProfile.experience_years !== undefined) parts.push(`Experience: ${userProfile.experience_years} years`);
+    if (userProfile.skills && userProfile.skills.length > 0) parts.push(`Skills: ${userProfile.skills.join(', ')}`);
+    if (userProfile.linkedin) parts.push(`LinkedIn: ${userProfile.linkedin}`);
+    if (userProfile.phone) parts.push(`Phone: ${userProfile.phone}`);
+
+    // Add a concise experience summary
+    if (userProfile.experiences && userProfile.experiences.length > 0) {
+      const expSummaries = userProfile.experiences.slice(0, 3).map(exp => {
+        const dates: string[] = [];
+        if (exp.start_date) dates.push(new Date(exp.start_date).getFullYear().toString());
+        if (exp.is_current) {
+          dates.push('Present');
+        } else if (exp.end_date) {
+          dates.push(new Date(exp.end_date).getFullYear().toString());
+        }
+        const dateRange = dates.length > 0 ? ` (${dates.join(' - ')})` : '';
+        const achievements = exp.achievements && exp.achievements.length > 0 ? ` | Achievements: ${exp.achievements.slice(0,2).join('; ')}` : '';
+        const skillsUsed = exp.skills_used && exp.skills_used.length > 0 ? ` | Skills: ${exp.skills_used.slice(0,3).join(', ')}` : '';
+        return `${exp.job_title} at ${exp.company}${dateRange}${achievements}${skillsUsed}`;
+      });
+      parts.push(`Experience: \n- ${expSummaries.join('\n- ')}`);
+    }
+
+    const resumeDataParsed = parts.join('\n');
+
+    const emailGenerationPrompt = `You are a professional email writer. Write an email based on the information provided below. 
+The email will be sent to a recruiter, so make it crisp and to the point, without adding anything extra or made-up.
+
+Instructions:
+1. Greet the employer with "Hi" or "Hello", do not use "Dear".
+2. In the first paragraph:
+   - Introduce yourself using name, college, degree, and CGPA/marks (include CGPA only if >8 or marks only if >80%).
+   - Mention the company name and include a short, genuine compliment (e.g., "Lovely to see what you are building at {c_name}").
+3. In the second paragraph:
+   - Highlight work experience/internships, publications, relevant coursework, and skills in bullet points.
+   - If there are no internships or work experience, mention projects instead.
+4. Politely ask if there are any relevant jobs or internships available in the domain (based on previous internships/degree) and request a meeting.
+5. The signature must include: name → college/current company → LinkedIn (if available) → phone number.
+6. Make the tone humble, slightly respectful, and casual.
+7. Do not use bold or italics.
+8. Write naturally and do not use very optimistic and those words which humans generally do not use in daily conversations, so it does not sound like it was generated by an AI.
+9. Generate a subject line that looks appealing like exploring opportunities at {c_name} or would love to work at {c_name}.
+10. output in json with two keys as email_body and subject and email body should be in html markdown format.
+Inputs:
+recruiter_name: {r_name}
+resume_data_parsed: {resume_data_parsed}
+company_name: {c_name}`;
+
+    // Fill template
+    const filled = emailGenerationPrompt
+      .replace(/{r_name}/g, recruiterName)
+      .replace(/{c_name}/g, companyName)
+      .replace(/{resume_data_parsed}/g, resumeDataParsed || '');
+
+    return filled;
   }
 
   /**
@@ -1085,7 +1159,15 @@ Email: kulshreshthasarv@gmail.com`
    * Uses plain text formatting for better compatibility until HTML backend support is confirmed
    */
   getFormattedEmailContent(plainTextBody: string, useHtml: boolean = this.useHtmlEmails): string {
-    return useHtml ? this.formatAsHtml(plainTextBody) : this.formatAsPlainText(plainTextBody);
+    if (!useHtml) {
+      return this.formatAsPlainText(plainTextBody);
+    }
+    // If body already appears to be HTML, passthrough to avoid double-formatting
+    const looksLikeHtml = /<\s*(p|br|div|ul|ol|li|a|strong|em|span|table|h[1-6])\b/i.test(plainTextBody);
+    if (looksLikeHtml) {
+      return plainTextBody.trim();
+    }
+    return this.formatAsHtml(plainTextBody);
   }
 
   /**
