@@ -1,6 +1,6 @@
 // Google Analytics utility functions
 
-export const GA_TRACKING_ID = 'G-BZT6T4QE76';
+export const GA_TRACKING_ID = process.env.NEXT_PUBLIC_GA_TRACKING_ID || 'G-BZT6T4QE76';
 
 // Track page views
 export const pageview = (url: string) => {

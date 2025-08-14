@@ -32,19 +32,50 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     };
   }, [router.events]);
 
+  // Fallback Google Analytics implementation
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.gtag) {
+      // Load Google Analytics manually if Script component fails
+      const script = document.createElement('script');
+      script.async = true;
+      script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`;
+      script.onload = () => {
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function() {
+          window.dataLayer.push(arguments);
+        };
+        window.gtag('js', new Date());
+        window.gtag('config', GA_TRACKING_ID);
+        console.log('Google Analytics loaded via fallback method');
+      };
+      document.head.appendChild(script);
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Google tag (gtag.js) */}
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`}
         strategy="afterInteractive"
+        onLoad={() => {
+          console.log('Google Analytics script loaded successfully');
+        }}
+        onError={() => {
+          console.error('Failed to load Google Analytics script');
+        }}
       />
       <Script id="gtag-init" strategy="afterInteractive">
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('config', '${GA_TRACKING_ID}');
+          gtag('config', '${GA_TRACKING_ID}', {
+            page_title: document.title,
+            page_location: window.location.href,
+            debug_mode: ${process.env.NODE_ENV === 'development' ? 'true' : 'false'}
+          });
+          console.log('Google Analytics initialized with ID: ${GA_TRACKING_ID}');
         `}
       </Script>
       <AuthProvider>
