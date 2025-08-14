@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import { getConfig } from '../config/environment';
-import { apiClient } from './api';
 
 const config = getConfig();
 const supabaseUrl = config.supabase.url;
@@ -33,8 +32,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Test connection function
 export const testConnection = async () => {
   try {
-    const { success } = await apiClient.getDbHealth();
-    return !!success;
+    const { data: session } = await supabase.auth.getSession();
+    return !!session?.session;
   } catch (error) {
     return false;
   }

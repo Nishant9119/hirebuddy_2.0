@@ -44,13 +44,27 @@ class ApiClient {
   /**
    * Get authentication headers
    */
-  private getHeaders(): HeadersInit {
+  private async getHeaders(): Promise<HeadersInit> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
 
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    // Fallback: attach Supabase access token if no backend token is present
+    if (!this.token) {
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data } = await supabase.auth.getSession();
+        const accessToken = data?.session?.access_token;
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+      } catch {
+        // ignore if supabase not available
+      }
     }
 
     return headers;
@@ -68,7 +82,7 @@ class ApiClient {
     const config: RequestInit = {
       ...options,
       headers: {
-        ...this.getHeaders(),
+        ...(await this.getHeaders()),
         ...options.headers,
       },
     };
