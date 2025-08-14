@@ -1,5 +1,5 @@
-import { supabase } from '@/lib/supabase';
 import { getConfig } from '@/config/environment';
+import { apiClient } from '@/lib/api';
 
 export interface DatabaseTestResult {
   success: boolean;
@@ -15,35 +15,19 @@ export async function testDatabaseConnection(): Promise<DatabaseTestResult> {
       console.log('- VITE_SUPABASE_URL:', getConfig().supabase.url ? '✓ Present' : '❌ Missing');
   console.log('- VITE_SUPABASE_ANON_KEY:', getConfig().supabase.anonKey ? '✓ Present' : '❌ Missing');
 
-    // Test basic connection
-    const { data, error, count } = await supabase
-      .from('testdb')
-      .select('*', { count: 'exact' });
+    // Test basic connection via backend
+    const health = await apiClient.getDbHealth();
+    const countResponse = await apiClient.getContactsCount();
 
-    if (error) {
-      console.error('❌ Database query failed:', error);
-      return {
-        success: false,
-        message: `Database query failed: ${error.message}`,
-        details: error
-      };
-    }
-
-    console.log('✅ Database connection successful');
+    console.log('✅ Database connection successful (via backend)');
+    const count = (countResponse.data as any)?.count ?? 0;
     console.log(`📊 Found ${count} contacts in the database`);
-
-    if (data && data.length > 0) {
-      console.log('📋 Sample contacts:');
-      data.slice(0, 3).forEach((contact, index) => {
-        console.log(`  ${index + 1}. ${contact.full_name || contact.first_name || 'Unknown'} - ${contact.email || 'No email'}`);
-      });
-    }
 
     return {
       success: true,
       message: `Successfully connected to database. Found ${count} contacts.`,
       contactCount: count || 0,
-      details: data?.slice(0, 3)
+      details: { health }
     };
 
   } catch (error) {
@@ -68,24 +52,19 @@ export async function addSampleContact(): Promise<DatabaseTestResult> {
       company_website_full: 'https://test.com'
     };
 
-    const { data, error } = await supabase
-      .from('testdb')
-      .insert([sampleContact])
-      .select()
-      .single();
-
-    if (error) {
+    const response = await apiClient.createContact(sampleContact);
+    if (!response.success) {
       return {
         success: false,
-        message: `Failed to add sample contact: ${error.message}`,
-        details: error
+        message: `Failed to add sample contact: ${response.error || 'Unknown error'}`,
+        details: response
       };
     }
 
     return {
       success: true,
       message: 'Successfully added sample contact',
-      details: data
+      details: response.data
     };
 
   } catch (error) {

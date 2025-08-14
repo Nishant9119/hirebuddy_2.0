@@ -492,10 +492,11 @@ export class DashboardService {
    */
   static async getTotalContactsCount(): Promise<number> {
     try {
-      const { count } = await supabase
-        .from('testdb')
-        .select('*', { count: 'exact', head: true });
-      return count || 0;
+      const { success, data } = await apiClient.getContactsCount();
+      if (success && data && typeof data === 'object' && 'count' in data) {
+        return (data as any).count as number;
+      }
+      return 0;
     } catch (error) {
       console.error('Error fetching total contacts count:', error);
       return 0;

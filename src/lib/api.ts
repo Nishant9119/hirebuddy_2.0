@@ -229,19 +229,45 @@ class ApiClient {
 
   // Contacts methods
   async getContacts(params?: Record<string, string>) {
-    return this.get('/contacts', params);
+    return this.get<any[]>('/contacts', params);
   }
 
   async createContact(contactData: any) {
-    return this.post('/contacts', contactData);
+    return this.post<any>('/contacts', contactData);
   }
 
   async updateContact(id: string, contactData: any) {
-    return this.put(`/contacts/${id}`, contactData);
+    return this.put<any>(`/contacts/${id}`, contactData);
   }
 
   async deleteContact(id: string) {
-    return this.delete(`/contacts/${id}`);
+    return this.delete<void>(`/contacts/${id}`);
+  }
+
+  // Contacts extras (migrated from client-side testdb access)
+  async searchContacts(query: string) {
+    return this.get<any[]>('/contacts/search', { query });
+  }
+
+  async getContactsWithEmail() {
+    return this.get<any[]>('/contacts/with-email');
+  }
+
+  async getContactsAvailableForEmail() {
+    return this.get<any[]>('/contacts/available-for-email');
+  }
+
+  async markContactEmailSent(id: string) {
+    return this.post<void>(`/contacts/${id}/email-sent`);
+  }
+
+  async getContactsCount() {
+    return this.get<{ count: number }>('/contacts/count');
+  }
+
+  // Health
+  async getDbHealth() {
+    return this.get<{ ok: boolean }>('/health/db');
   }
 
   // Dashboard methods

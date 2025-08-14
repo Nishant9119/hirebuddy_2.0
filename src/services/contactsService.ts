@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 import { DashboardService } from './dashboardService';
 
 export interface Contact {
@@ -31,32 +32,14 @@ export interface ContactForDisplay {
 }
 
 class ContactsService {
-  // Get all contacts from the testdb table
+  // Get all contacts (via backend)
   async getContacts(): Promise<ContactForDisplay[]> {
     try {
-      console.log('🔍 Fetching contacts from database...');
-      console.log('Supabase client initialized:', !!supabase);
-      
-      const { data, error } = await supabase
-        .from('testdb')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('❌ Supabase error fetching contacts:', error);
-        console.error('Error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw new Error(`Failed to fetch contacts: ${error.message} (Code: ${error.code})`);
-      }
-
-      console.log('✅ Successfully fetched contacts:', data?.length || 0);
+      const { success, data } = await apiClient.getContacts();
+      if (!success) throw new Error('Failed to fetch contacts');
 
       // Transform the data to match the expected interface
-      const transformedContacts: ContactForDisplay[] = (data || []).map((contact: Contact) => ({
+      const transformedContacts: ContactForDisplay[] = ((data as any[]) || []).map((contact: Contact) => ({
         id: contact.id,
         name: contact.full_name || contact.first_name || 'Unknown',
         email: contact.email || '',
@@ -81,7 +64,7 @@ class ContactsService {
     }
   }
 
-  // Add a new contact to the testdb table
+  // Add a new contact (via backend)
   async addContact(contactData: {
     full_name?: string;
     first_name?: string;
@@ -92,98 +75,61 @@ class ContactsService {
     company_website_full?: string;
   }): Promise<Contact> {
     try {
-      const { data, error } = await supabase
-        .from('testdb')
-        .insert([contactData])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding contact:', error);
-        throw new Error(`Failed to add contact: ${error.message}`);
+      const { success, data, error } = await apiClient.createContact(contactData);
+      if (!success) {
+        throw new Error(error || 'Failed to add contact');
       }
-
-      return data;
+      return data as unknown as Contact;
     } catch (error) {
       console.error('Error in addContact:', error);
       throw error;
     }
   }
 
-  // Update a contact in the testdb table
+  // Update a contact (via backend)
   async updateContact(id: string, updates: Partial<Contact>): Promise<Contact> {
     try {
-      const { data, error } = await supabase
-        .from('testdb')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error updating contact:', error);
-        throw new Error(`Failed to update contact: ${error.message}`);
+      const { success, data, error } = await apiClient.updateContact(id, updates);
+      if (!success) {
+        throw new Error(error || 'Failed to update contact');
       }
-
-      return data;
+      return data as unknown as Contact;
     } catch (error) {
       console.error('Error in updateContact:', error);
       throw error;
     }
   }
 
-  // Mark email as sent for a contact
+  // Mark email as sent for a contact (via backend)
   async markEmailSent(contactId: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('testdb')
-        .update({ email_sent_on: new Date().toISOString() })
-        .eq('id', contactId);
-
-      if (error) {
-        console.error('Error marking email as sent:', error);
-        throw new Error(`Failed to mark email as sent: ${error.message}`);
-      }
+      const { success, error } = await apiClient.markContactEmailSent(contactId);
+      if (!success) throw new Error(error || 'Failed to mark email as sent');
     } catch (error) {
       console.error('Error in markEmailSent:', error);
       throw error;
     }
   }
 
-  // Delete a contact from the testdb table
+  // Delete a contact (via backend)
   async deleteContact(id: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('testdb')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error deleting contact:', error);
-        throw new Error(`Failed to delete contact: ${error.message}`);
-      }
+      const { success, error } = await apiClient.deleteContact(id);
+      if (!success) throw new Error(error || 'Failed to delete contact');
     } catch (error) {
       console.error('Error in deleteContact:', error);
       throw error;
     }
   }
 
-  // Search contacts by name, email, or company
+  // Search contacts by name, email, or company (via backend)
   async searchContacts(searchTerm: string): Promise<ContactForDisplay[]> {
     try {
-      const { data, error } = await supabase
-        .from('testdb')
-        .select('*')
-        .or(`full_name.ilike.%${searchTerm}%,first_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,company_name.ilike.%${searchTerm}%`)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error searching contacts:', error);
-        throw new Error(`Failed to search contacts: ${error.message}`);
-      }
+      const { success, data, error } = await apiClient.searchContacts(searchTerm);
+      if (!success) throw new Error(error || 'Failed to search contacts');
 
       // Transform the data to match the expected interface
-      const transformedContacts: ContactForDisplay[] = (data || []).map((contact: Contact) => ({
+      const transformedContacts: ContactForDisplay[] = ((data as any[]) || []).map((contact: Contact) => ({
         id: contact.id,
         name: contact.full_name || contact.first_name || 'Unknown',
         email: contact.email || '',
@@ -205,23 +151,14 @@ class ContactsService {
     }
   }
 
-  // Get contacts with email addresses only
+  // Get contacts with email addresses only (via backend)
   async getContactsWithEmail(): Promise<ContactForDisplay[]> {
     try {
-      const { data, error } = await supabase
-        .from('testdb')
-        .select('*')
-        .not('email', 'is', null)
-        .neq('email', '')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching contacts with email:', error);
-        throw new Error(`Failed to fetch contacts with email: ${error.message}`);
-      }
+      const { success, data, error } = await apiClient.getContactsWithEmail();
+      if (!success) throw new Error(error || 'Failed to fetch contacts with email');
 
       // Transform the data to match the expected interface
-      const transformedContacts: ContactForDisplay[] = (data || []).map((contact: Contact) => ({
+      const transformedContacts: ContactForDisplay[] = ((data as any[]) || []).map((contact: Contact) => ({
         id: contact.id,
         name: contact.full_name || contact.first_name || 'Unknown',
         email: contact.email || '',
@@ -421,40 +358,14 @@ class ContactsService {
     }
   }
 
-  // Get contacts that haven't been sent emails in the last 7 days (for compose section)
+  // Get contacts that haven't been sent emails in the last 7 days (via backend)
   async getContactsAvailableForEmail(): Promise<ContactForDisplay[]> {
     try {
-      console.log('🔍 Fetching contacts available for email (no emails sent in last 7 days)...');
-      
-      // Calculate 7 days ago
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
-      console.log('7 days ago cutoff:', sevenDaysAgo.toISOString());
-
-      const { data, error } = await supabase
-        .from('testdb')
-        .select('*')
-        .not('email', 'is', null)
-        .neq('email', '')
-        .or(`email_sent_on.is.null,email_sent_on.lt.${sevenDaysAgo.toISOString()}`)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('❌ Supabase error fetching contacts available for email:', error);
-        console.error('Error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw new Error(`Failed to fetch contacts available for email: ${error.message} (Code: ${error.code})`);
-      }
-
-      console.log('✅ Successfully fetched contacts available for email:', data?.length || 0);
+      const { success, data, error } = await apiClient.getContactsAvailableForEmail();
+      if (!success) throw new Error(error || 'Failed to fetch contacts available for email');
 
       // Transform the data to match the expected interface
-      const transformedContacts: ContactForDisplay[] = (data || []).map((contact: Contact) => ({
+      const transformedContacts: ContactForDisplay[] = ((data as any[]) || []).map((contact: Contact) => ({
         id: contact.id,
         name: contact.full_name || contact.first_name || 'Unknown',
         email: contact.email || '',
@@ -469,10 +380,6 @@ class ContactsService {
         updated_at: contact.created_at,
       }));
 
-      console.log('Contacts breakdown:');
-      console.log('- Never sent emails:', transformedContacts.filter(c => !c.email_sent_on).length);
-      console.log('- Last email sent more than 7 days ago:', transformedContacts.filter(c => c.email_sent_on && new Date(c.email_sent_on) < sevenDaysAgo).length);
-
       return transformedContacts;
     } catch (error) {
       console.error('❌ Error in getContactsAvailableForEmail:', error);
@@ -483,44 +390,7 @@ class ContactsService {
     }
   }
 
-  // Fallback method for old testdb system
-  private async getContactsWithEmailFromtestdb(): Promise<ContactForDisplay[]> {
-    try {
-      const { data, error } = await supabase
-        .from('testdb')
-        .select('*')
-        .not('email', 'is', null)
-        .neq('email', '')
-        .not('email_sent_on', 'is', null)
-        .order('email_sent_on', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching contacts with sent emails from testdb:', error);
-        throw new Error(`Failed to fetch contacts with sent emails: ${error.message}`);
-      }
-
-      // Transform the data to match the expected interface
-      const transformedContacts: ContactForDisplay[] = (data || []).map((contact: Contact) => ({
-        id: contact.id,
-        name: contact.full_name || contact.first_name || 'Unknown',
-        email: contact.email || '',
-        company: contact.company_name || undefined,
-        title: contact.title || undefined,
-        linkedin_link: contact.linkedin_link || undefined,
-        company_website: contact.company_website_full || undefined,
-        email_sent_on: contact.email_sent_on || undefined,
-        status: 'active' as const,
-        email_sent: true,
-        created_at: contact.created_at,
-        updated_at: contact.created_at,
-      }));
-
-      return transformedContacts;
-    } catch (error) {
-      console.error('Error in getContactsWithEmailFromtestdb:', error);
-      throw error;
-    }
-  }
+  // Removed fallback that queried testdb directly on the client
 }
 
 export const contactsService = new ContactsService(); 

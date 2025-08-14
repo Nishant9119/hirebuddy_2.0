@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { getConfig } from '../config/environment';
+import { apiClient } from './api';
 
 const config = getConfig();
 const supabaseUrl = config.supabase.url;
@@ -32,20 +33,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Test connection function
 export const testConnection = async () => {
   try {
-    const { data, error } = await supabase
-      .from('testdb')
-      .select('count', { count: 'exact', head: true })
-      .limit(1);
-    
-    if (error) {
-      console.error('Database connection test failed:', error);
-      return false;
-    }
-    
-    console.log('✅ Database connection successful');
-    return true;
+    const { success } = await apiClient.getDbHealth();
+    return !!success;
   } catch (error) {
-    console.error('Database connection test error:', error);
     return false;
   }
 };
