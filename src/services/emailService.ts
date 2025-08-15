@@ -62,6 +62,7 @@ export interface UserProfileData {
   skills?: string[];
   experience_years?: number;
   college?: string;
+  degree?: string;
   linkedin?: string;
   github?: string;
   website?: string;

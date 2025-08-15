@@ -12,6 +12,7 @@ export interface ProfileCompletionData {
   bio?: string;
   skills?: string[];
   college?: string;
+  degree?: string;
   linkedin?: string;
   github?: string;
   website?: string;
@@ -52,7 +53,8 @@ export function calculateProfileCompletion(
     { key: 'phone', weight: 10 },
     { key: 'bio', weight: 20 },
     { key: 'skills', weight: 15 },
-    { key: 'college', weight: 10 },
+    { key: 'college', weight: 8 },
+    { key: 'degree', weight: 7 },
     { key: 'linkedin', weight: 5 },
     { key: 'github', weight: 5 },
     { key: 'website', weight: 5 },

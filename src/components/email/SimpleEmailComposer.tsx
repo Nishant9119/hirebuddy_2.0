@@ -84,6 +84,7 @@ const SimpleEmailComposer: React.FC<SimpleEmailComposerProps> = ({
               skills: profile.skills,
               experience_years: profile.experience_years,
               college: profile.college,
+              degree: profile.degree,
               linkedin: profile.linkedin,
               github: profile.github,
               website: profile.website,
@@ -141,6 +142,7 @@ const SimpleEmailComposer: React.FC<SimpleEmailComposerProps> = ({
         skills: userProfile?.skills,
         experience_years: userProfile?.experience_years,
         college: userProfile?.college,
+        degree: userProfile?.degree,
         linkedin: userProfile?.linkedin,
         github: userProfile?.github,
         website: userProfile?.website

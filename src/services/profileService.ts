@@ -13,6 +13,7 @@ export interface UserProfile {
   github?: string;
   linkedin?: string;
   college?: string;
+  degree?: string;
   skills?: string[];
   experience_years?: number;
   available_for_work?: boolean;

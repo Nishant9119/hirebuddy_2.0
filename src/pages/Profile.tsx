@@ -888,20 +888,37 @@ const Profile = () => {
                         <GraduationCap className="w-4 h-4 mr-2 text-gray-500" />
                         Education
                       </h4>
-                      <div>
-                        <Label htmlFor="college">College/University</Label>
-                        {isEditing ? (
-                          <Input
-                            id="college"
-                            value={profile.college || ""}
-                            onChange={(e) => handleInputChange('college', e.target.value)}
-                            placeholder="e.g. Harvard University"
-                          />
-                        ) : (
-                          <p className="mt-1 text-sm text-gray-900">
-                            {profile.college || "Not set"}
-                          </p>
-                        )}
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="college">College/University</Label>
+                          {isEditing ? (
+                            <Input
+                              id="college"
+                              value={profile.college || ""}
+                              onChange={(e) => handleInputChange('college', e.target.value)}
+                              placeholder="e.g. Harvard University"
+                            />
+                          ) : (
+                            <p className="mt-1 text-sm text-gray-900">
+                              {profile.college || "Not set"}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <Label htmlFor="degree">Degree</Label>
+                          {isEditing ? (
+                            <Input
+                              id="degree"
+                              value={profile.degree || ""}
+                              onChange={(e) => handleInputChange('degree', e.target.value)}
+                              placeholder="e.g. Bachelor of Science in Computer Science"
+                            />
+                          ) : (
+                            <p className="mt-1 text-sm text-gray-900">
+                              {profile.degree || "Not set"}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
 
