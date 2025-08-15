@@ -18,7 +18,6 @@ import { contactsService } from '@/services/contactsService';
 import { conversationService, ContactWithConversation, EmailConversation } from '@/services/conversationService';
 import { JOB_ROLES, DEFAULT_JOB_ROLE } from '@/constants/jobRoles';
 import WhatsAppLikeConversation from './WhatsAppLikeConversation';
-import EmailPreview from './EmailPreview';
 import { 
   Mail, 
   Send, 
@@ -42,8 +41,7 @@ import {
   FileText,
   Paperclip,
   X,
-  Download,
-  Eye
+  Download
 } from 'lucide-react';
 
 interface Contact {
@@ -130,8 +128,8 @@ const AWSEmailComposer = ({
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Toggle between formatted HTML view and source editing
-  const [showFormattedView, setShowFormattedView] = useState(true);
+  // Always show formatted view
+  const showFormattedView = true;
 
   // Initialize sender email from authenticated user
   useEffect(() => {
@@ -656,10 +654,7 @@ const AWSEmailComposer = ({
         body: aiResponse.body
       }));
 
-      // If the generated body looks like HTML, default to formatted view
-      if (/<\w+[^>]*>/.test(aiResponse.body)) {
-        setShowFormattedView(true);
-      }
+      // Email content generated successfully
 
       toast({
         title: "AI Email Generated",
@@ -1019,28 +1014,6 @@ const AWSEmailComposer = ({
                 <div className="flex items-center justify-between">
                   <Label htmlFor="body">Email Content</Label>
                   <div className="flex items-center gap-2">
-                    <EmailPreview 
-                      subject={emailData.subject} 
-                      body={emailData.body}
-                    >
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={!emailData.body}
-                        className="flex items-center gap-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        Preview
-                      </Button>
-                    </EmailPreview>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowFormattedView(v => !v)}
-                      className="flex items-center gap-2"
-                    >
-                      {showFormattedView ? 'Show Source' : 'Show Formatted'}
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1057,22 +1030,13 @@ const AWSEmailComposer = ({
                     </Button>
                   </div>
                 </div>
-                {showFormattedView && emailData.body ? (
-                  <div className="min-h-[300px] p-4 bg-white border rounded-md">
-                    <div
-                      className="prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: emailService.getFormattedEmailContent(emailData.body, true) }}
-                    />
-                  </div>
-                ) : (
-                  <Textarea
-                    id="body"
-                    placeholder="Write your email content here... or use AI generation to create personalized content based on your profile and the selected contact."
-                    className="min-h-[300px]"
-                    value={emailData.body}
-                    onChange={(e) => setEmailData(prev => ({ ...prev, body: e.target.value }))}
-                  />
-                )}
+                <Textarea
+                  id="body"
+                  placeholder="Write your email content here... or use AI generation to create personalized content based on your profile and the selected contact."
+                  className="min-h-[300px]"
+                  value={emailData.body}
+                  onChange={(e) => setEmailData(prev => ({ ...prev, body: e.target.value }))}
+                />
                 {isGeneratingAI && (
                   <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 p-2 rounded">
                     <Sparkles className="h-4 w-4 animate-pulse" />
@@ -1454,20 +1418,6 @@ const AWSEmailComposer = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="followup-body">Follow-up Message</Label>
-                    <EmailPreview 
-                      subject="Re: Follow-up" 
-                      body={followUpData.body}
-                    >
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={!followUpData.body}
-                        className="flex items-center gap-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        Preview
-                      </Button>
-                    </EmailPreview>
                   </div>
                   <Textarea
                     id="followup-body"
