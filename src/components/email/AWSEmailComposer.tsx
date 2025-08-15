@@ -18,6 +18,7 @@ import { contactsService } from '@/services/contactsService';
 import { conversationService, ContactWithConversation, EmailConversation } from '@/services/conversationService';
 import { JOB_ROLES, DEFAULT_JOB_ROLE } from '@/constants/jobRoles';
 import WhatsAppLikeConversation from './WhatsAppLikeConversation';
+import urlShortenerService from '@/services/urlShortenerService';
 import { 
   Mail, 
   Send, 
@@ -356,8 +357,19 @@ const AWSEmailComposer = ({
         // Prepare email body with resume link if attachment is selected
         let emailBody = emailData.body;
         if (emailData.attachResume && userProfileComplete?.resume_url) {
-          const resumeSection = `\n\n---\n📄 Resume: ${userProfileComplete.resume_url}\n(Click the link above to view or download my resume)`;
-          emailBody = emailData.body + resumeSection;
+          try {
+            console.log('Attaching resume with URL:', userProfileComplete.resume_url);
+            const resumeLink = await urlShortenerService.createResumeLink(userProfileComplete.resume_url);
+            const resumeSection = `\n\n${resumeLink}`;
+            emailBody = emailData.body + resumeSection;
+            console.log('Resume section added:', resumeSection);
+          } catch (error) {
+            console.error('Error creating resume link:', error);
+            // Fallback to original format
+            const resumeSection = `\n\nHere is my Resume = ${userProfileComplete.resume_url}`;
+            emailBody = emailData.body + resumeSection;
+            console.log('Using fallback resume section:', resumeSection);
+          }
         }
 
         const isHtmlEnabled = emailService.isHtmlEmailsEnabled();
@@ -392,7 +404,7 @@ const AWSEmailComposer = ({
         
         toast({
           title: "Email Sent Successfully",
-          description: `Email sent to ${contact.name} (${contact.email})${emailData.attachResume ? ' with resume link included' : ''}`,
+          description: `Email sent to ${contact.name} (${contact.email})${emailData.attachResume ? ' with professional resume link' : ''}`,
         });
         
         // Clear form after successful send
@@ -1098,7 +1110,7 @@ const AWSEmailComposer = ({
 
               {/* Resume Link Section */}
               <div className="space-y-3">
-                <Label className="text-sm md:text-base font-medium">Resume Link</Label>
+                <Label className="text-sm md:text-base font-medium">Professional Resume Link</Label>
                 {userProfileComplete?.resume_url ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg border">
@@ -1137,7 +1149,7 @@ const AWSEmailComposer = ({
                         className="w-3 h-3 md:w-4 md:h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                       />
                       <Label htmlFor="attach-resume" className="text-xs md:text-sm text-gray-700 cursor-pointer">
-                        Include resume link in this email
+                        Include professional resume link in this email
                       </Label>
                     </div>
                     
@@ -1145,7 +1157,7 @@ const AWSEmailComposer = ({
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-xs md:text-sm text-green-600 bg-green-50 p-2 md:p-3 rounded-lg border border-green-200">
                           <Paperclip className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
-                          <span className="flex-1">Resume link will be included in your email</span>
+                          <span className="flex-1">Professional resume link will be included in your email</span>
                           <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs px-1 py-0.5 md:px-2 md:py-1">
                             {userProfileComplete.resume_filename?.split('.').pop()?.toUpperCase() || 'PDF'}
                           </Badge>
@@ -1205,7 +1217,7 @@ const AWSEmailComposer = ({
                     {emailData.attachResume && userProfileComplete?.resume_url && (
                       <div className="flex items-center space-x-2 mt-2 pt-2 border-t border-blue-200">
                         <Paperclip className="h-4 w-4" />
-                        <span>Resume link included: {userProfileComplete.resume_filename || 'Resume.pdf'}</span>
+                        <span>Professional resume link will be included</span>
                       </div>
                     )}
                   </div>
@@ -1229,7 +1241,7 @@ const AWSEmailComposer = ({
                   </>
                 )}
                 {isSending ? 'Sending...' : selectedContact ? 
-                  `Send to ${selectedContact.name}${emailData.attachResume ? ' (with resume link)' : ''}` : 
+                  `Send to ${selectedContact.name}${emailData.attachResume ? ' (with professional resume link)' : ''}` : 
                   'Select a recipient'
                 }
               </Button>
