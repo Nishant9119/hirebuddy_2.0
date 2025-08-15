@@ -128,8 +128,8 @@ const AWSEmailComposer = ({
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Always show formatted view
-  const showFormattedView = true;
+  // State for editing mode
+  const [isEditing, setIsEditing] = useState(false);
 
   // Initialize sender email from authenticated user
   useEffect(() => {
@@ -654,6 +654,9 @@ const AWSEmailComposer = ({
         body: aiResponse.body
       }));
 
+      // Reset editing state to show formatted view
+      setIsEditing(false);
+
       // Email content generated successfully
 
       toast({
@@ -1030,13 +1033,47 @@ const AWSEmailComposer = ({
                     </Button>
                   </div>
                 </div>
-                <Textarea
-                  id="body"
-                  placeholder="Write your email content here... or use AI generation to create personalized content based on your profile and the selected contact."
-                  className="min-h-[300px]"
-                  value={emailData.body}
-                  onChange={(e) => setEmailData(prev => ({ ...prev, body: e.target.value }))}
-                />
+                {emailData.body && !isEditing ? (
+                  <div className="min-h-[300px] p-4 bg-white border rounded-md">
+                    <div className="flex justify-end mb-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditing(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Edit
+                      </Button>
+                    </div>
+                    <div
+                      className="prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: emailService.getFormattedEmailContent(emailData.body, true) }}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {isEditing && (
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsEditing(false)}
+                          className="flex items-center gap-2"
+                        >
+                          Done
+                        </Button>
+                      </div>
+                    )}
+                    <Textarea
+                      id="body"
+                      placeholder="Write your email content here... or use AI generation to create personalized content based on your profile and the selected contact."
+                      className="min-h-[300px]"
+                      value={emailData.body}
+                      onChange={(e) => setEmailData(prev => ({ ...prev, body: e.target.value }))}
+                    />
+                  </div>
+                )}
                 {isGeneratingAI && (
                   <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 p-2 rounded">
                     <Sparkles className="h-4 w-4 animate-pulse" />
