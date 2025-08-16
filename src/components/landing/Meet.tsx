@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { Button } from "../ui/button";
 
@@ -9,10 +10,11 @@ export const Meet = () => {
         <div className="text-center mb-16 space-y-4">
           <div className="flex justify-center mb-4">
             <div className="w-12 h-12 flex items-center justify-center">
-              <img
+              <Image
                 src="/meet/hand.svg"
                 alt="Wave hand"
-                className="w-12 h-12"
+                width={48}
+                height={48}
               />
             </div>
           </div>
@@ -30,10 +32,11 @@ export const Meet = () => {
           {/* Search Card */}
           <div className="bg-[#d35c65] rounded-3xl p-8 text-center space-y-4">
             <div className="relative w-full aspect-square max-w-[300px] mx-auto">
-              <img
+              <Image
                 src="/meet/targeted-search.svg"
                 alt="Targeted search"
-                className="w-full h-full object-contain"
+                fill
+                className="object-contain"
               />
             </div>
             <h3 className="text-3xl font-mabry font-semibold text-white">
@@ -49,10 +52,11 @@ export const Meet = () => {
           {/* Apply Card */}
           <div className="bg-white rounded-3xl p-8 text-center space-y-4">
             <div className="relative w-full aspect-square max-w-[300px] mx-auto">
-              <img
+              <Image
                 src="/meet/apply-effortlessly.svg"
                 alt="Apply effortlessly"
-                className="w-full h-full object-contain"
+                fill
+                className="object-contain"
               />
             </div>
             <h2 className="text-3xl font-mabry font-semibold text-[#403334]">
@@ -68,10 +72,11 @@ export const Meet = () => {
           {/* CVs Card */}
           <div className="bg-[#d35c65] rounded-3xl p-8 text-center space-y-4">
             <div className="relative w-full aspect-square max-w-[300px] mx-auto">
-              <img
+              <Image
                 src="/meet/tailored-svg.svg"
                 alt="Tailored CVs"
-                className="w-full h-full object-contain"
+                fill
+                className="object-contain"
               />
             </div>
             <h3 className="text-3xl font-mabry font-semibold text-white">
@@ -89,10 +94,11 @@ export const Meet = () => {
           {/* Email Card */}
           <div className="flex-1 bg-white rounded-3xl p-4 pt-2 pb-3 text-center">
             <div className="relative w-full aspect-[4/3] max-w-[400px] mx-auto mb-2">
-              <img
+              <Image
                 src="/meet/personalized-email.svg"
                 alt="Personalized Emails"
-                className="w-full h-full object-contain"
+                fill
+                className="object-contain"
               />
             </div>
             <h3 className="text-2xl font-mabry font-semibold text-[#403334] mb-1">
@@ -108,11 +114,12 @@ export const Meet = () => {
           {/* Bento Filler - Hidden on mobile */}
           <div className="hidden md:block">
             <div className="rounded-2xl p-4 h-full flex items-center">
-              <img
+              <Image
                 src="/meet/bento-filler.svg"
                 alt="Feature icons"
+                width={80}
+                height={400}
                 className="w-auto h-max -my-5"
-                style={{ width: '80px', height: '400px' }}
               />
             </div>
           </div>
@@ -120,10 +127,11 @@ export const Meet = () => {
           {/* Tracking Card */}
           <div className="flex-1 bg-white rounded-3xl p-4 pt-2 pb-3 text-center">
             <div className="relative w-full aspect-[4/3] max-w-[400px] mx-auto mb-2">
-              <img
+              <Image
                 src="/meet/application-tracking.svg"
                 alt="Application Tracking"
-                className="w-full h-full object-contain"
+                fill
+                className="object-contain"
               />
             </div>
             <h3 className="text-2xl font-mabry font-semibold text-[#403334] mb-1">
@@ -139,7 +147,7 @@ export const Meet = () => {
 
         {/* CTA Button */}
         <div className="text-center mt-16 px-4 sm:px-0">
-        <Button
+          <Button
             className="w-full sm:w-[280px] h-14 px-8 text-xl font-normal rounded-md bg-gradient-to-t from-[#b24e55] to-[#E3405F] hover:opacity-90 text-white flex items-center justify-center gap-2 mx-auto"
             asChild
           >
@@ -166,4 +174,4 @@ export const Meet = () => {
       </div>
     </section>
   );
-}; 
+};

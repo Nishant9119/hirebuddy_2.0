@@ -75,7 +75,7 @@ export const Hero = () => {
       {/* What's new badge */}
       <div className="mb-8">
         <div className="inline-flex items-center rounded-full border border-[#ffe0e0] bg-[#ffe0e0] px-4 py-1.5">
-          <span className="text-sm font-bold text-[#3e3233]">What's new</span>
+          <span className="text-sm font-medium font-bold text-[#3e3233]">What's new</span>
           <div className="mx-2 h-4 w-[1px] bg-[#b16368]" />
           <span className="text-sm font-bold text-[#b16368]">
             Coming soon to mobile
@@ -83,8 +83,8 @@ export const Hero = () => {
         </div>
       </div>
 
-       {/* Main heading */}
-       <h1 className="text-4xl md:text-5xl lg:text-6xl text-center font-semibold text-[#403334] max-w-4xl mb-6">
+      {/* Main heading */}
+      <h1 className="text-4xl md:text-5xl lg:text-6xl text-center  font-mabry font-bold text-[#403334] max-w-4xl mb-6">
         Land your <span className="text-[#b24e55]">next opportunity</span>{" "}
         without lifting a finger.
       </h1>
@@ -101,7 +101,7 @@ export const Hero = () => {
         <div className="flex flex-col sm:flex-row gap-3 bg-white p-2 rounded-xl shadow-[0_4px_60px_rgba(231,90,130,0.35)]">
           <AnimatedPlaceholderInput />
           <Button
-            className="h-14 px-8 text-lg font-normal rounded-xl bg-gradient-to-t from-[#b24e55] to-[#E3405F] hover:opacity-90 text-white whitespace-nowrap"
+            className="h-14 px-8 text-lg font-normal rounded-xl bg-gradient-to-t from-[#b24e55] to-[#E3405F] hover:opacity-90 text-white font-bold whitespace-nowrap"
             onClick={() => (window.location.href = "/signup")}
           >
             Find your next role

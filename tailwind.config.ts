@@ -20,8 +20,9 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				mabry: ['var(--font-mabry-pro)', 'sans-serif'],
-			},
+				mabry: ['var(--font-mabry-pro)'],
+				roboto: ['var(--font-roboto)'],
+			  },
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',

@@ -122,9 +122,9 @@ export const Header = ({ openSignIn }: HeaderProps = {}) => {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          <Link to="/" className="text-[#633b3d] font-sans text-2xl font-bold tracking-tighter">
-            Hirebuddy
-          </Link>
+          <Link href="/" className="text-[#633b3d] font-sans text-2xl font-bold tracking-tighter">
+        Hirebuddy
+      </Link>
         </motion.div>
 
         {/* Hamburger Menu Button (Mobile) */}
