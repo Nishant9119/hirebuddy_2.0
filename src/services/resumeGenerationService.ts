@@ -14,7 +14,7 @@ export interface ResumeGenerationResponse {
 }
 
 export class ResumeGenerationService {
-  private apiBaseUrl = 'https://9dfupb4d2a.execute-api.us-east-1.amazonaws.com/api';
+  private apiBaseUrl = 'https://9dfupb4d2a.execute-api.us-east-1.amazonaws.com';
 
   /**
    * Generate email content using the resume generation API directly
