@@ -14,55 +14,51 @@ export interface ResumeGenerationResponse {
 }
 
 export class ResumeGenerationService {
-  private apiBaseUrl = 'https://9dfupb4d2a.execute-api.us-east-1.amazonaws.com/api';
+  private supabaseUrl: string;
+
+  constructor() {
+    this.supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '') as string;
+  }
 
   /**
-   * Generate email content using the resume generation API
+   * Generate email content using the resume generation API via Supabase Edge Function
    */
   async generateEmailWithResume(request: ResumeGenerationRequest): Promise<ResumeGenerationResponse> {
     try {
-      console.log('🚀 Generating email with resume using API:', request);
+      console.log('🚀 Generating email with resume using Supabase Edge Function:', request);
 
-      const response = await fetch(`${this.apiBaseUrl}/upload_resume`, {
+      // Get current session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('Authentication required for resume generation');
+      }
+
+      const response = await fetch(`${this.supabaseUrl}/functions/v1/resume-generation-proxy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '') as string
         },
         body: JSON.stringify(request),
       });
 
-      console.log('📡 Resume Generation API Response:', response.status, response.statusText);
+      console.log('📡 Resume Generation Proxy Response:', response.status, response.statusText);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Resume Generation API Error:', { status: response.status, error: errorText });
+        const errorData = await response.json();
+        console.error('❌ Resume Generation Proxy Error:', { status: response.status, error: errorData });
         
-        // Provide specific error messages based on status codes
-        if (response.status === 400) {
-          throw new Error(`Invalid request: ${errorText}`);
-        } else if (response.status === 401) {
-          throw new Error('Authentication failed. Please check your API credentials.');
-        } else if (response.status === 403) {
-          throw new Error('Access forbidden. Please check your permissions.');
-        } else if (response.status === 429) {
-          throw new Error('Rate limit exceeded. Please try again later.');
-        } else if (response.status === 500) {
-          throw new Error('Server error. Please try again later or contact support.');
-        } else {
-          throw new Error(`Failed to generate email: ${response.status} - ${errorText}`);
-        }
+        // Extract error message from the proxy response
+        const errorMessage = errorData.error || `Failed to generate email: ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       console.log('✅ Email generated successfully:', data);
 
-      return {
-        success: true,
-        email_body: data.email_body,
-        subject: data.subject
-      };
+      return data;
     } catch (error) {
       console.error('Error generating email with resume:', error);
       return {

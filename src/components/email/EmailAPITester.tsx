@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getConfig } from '@/config/environment';
 import emailService, { EmailSendRequest, FollowUpRequest } from '@/services/emailService';
+import { resumeGenerationService } from '@/services/resumeGenerationService';
 import { 
   CheckCircle, 
   AlertCircle, 
@@ -18,7 +19,8 @@ import {
   RefreshCw,
   Zap,
   MessageSquare,
-  User
+  User,
+  FileText
 } from 'lucide-react';
 
 const EmailAPITester = () => {
@@ -36,6 +38,12 @@ const EmailAPITester = () => {
     to: '',
     body: 'This is a test follow-up email.'
   });
+  const [resumeTestData, setResumeTestData] = useState({
+    contactName: '',
+    companyName: ''
+  });
+  const [isTestingResume, setIsTestingResume] = useState(false);
+  const [resumeTestResult, setResumeTestResult] = useState<{ subject: string; body: string } | null>(null);
 
   const { toast } = useToast();
   const { user } = useAuth();
@@ -174,6 +182,51 @@ const EmailAPITester = () => {
       console.error('Follow-up error:', error);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleTestResumeGeneration = async () => {
+    if (!resumeTestData.contactName || !resumeTestData.companyName) {
+      toast({
+        title: "Missing Fields",
+        description: "Please fill in both contact name and company name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTestingResume(true);
+    setResumeTestResult(null);
+    
+    try {
+      const response = await resumeGenerationService.generateEmailForContact(
+        resumeTestData.contactName,
+        resumeTestData.companyName
+      );
+
+      if (response.success && response.email_body && response.subject) {
+        setResumeTestResult({
+          subject: response.subject,
+          body: response.email_body
+        });
+        
+        toast({
+          title: "Email Generated Successfully",
+          description: "Resume-based email has been generated. Review the content below.",
+        });
+      } else {
+        throw new Error(response.error || 'Failed to generate email');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast({
+        title: "Resume Generation Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      console.error('Resume generation error:', error);
+    } finally {
+      setIsTestingResume(false);
     }
   };
 
@@ -366,6 +419,71 @@ const EmailAPITester = () => {
             )}
             {isSending ? 'Sending Follow-up...' : 'Send Follow-up'}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Test Resume Generation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <FileText className="h-5 w-5" />
+            <span>Test Resume Email Generation</span>
+          </CardTitle>
+          <CardDescription>
+            Test the resume-based email generation using your uploaded resume
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="resume-contact-name">Contact Name</Label>
+              <Input
+                id="resume-contact-name"
+                placeholder="John Smith"
+                value={resumeTestData.contactName}
+                onChange={(e) => setResumeTestData(prev => ({ ...prev, contactName: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="resume-company">Company Name</Label>
+              <Input
+                id="resume-company"
+                placeholder="TechCorp Inc."
+                value={resumeTestData.companyName}
+                onChange={(e) => setResumeTestData(prev => ({ ...prev, companyName: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <Button 
+            className="w-full"
+            onClick={handleTestResumeGeneration}
+            disabled={isTestingResume || !resumeTestData.contactName || !resumeTestData.companyName}
+          >
+            {isTestingResume ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4 mr-2" />
+            )}
+            {isTestingResume ? 'Generating Email...' : 'Generate Email from Resume'}
+          </Button>
+
+          {resumeTestResult && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-md">
+              <h4 className="font-semibold mb-2">Generated Email:</h4>
+              <div className="space-y-2">
+                <div>
+                  <strong>Subject:</strong> {resumeTestResult.subject}
+                </div>
+                <div>
+                  <strong>Body:</strong>
+                  <div className="mt-1 p-2 bg-white border rounded text-sm whitespace-pre-wrap">
+                    {resumeTestResult.body}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
