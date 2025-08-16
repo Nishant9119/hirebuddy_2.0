@@ -14,51 +14,80 @@ export interface ResumeGenerationResponse {
 }
 
 export class ResumeGenerationService {
-  private supabaseUrl: string;
-
-  constructor() {
-    this.supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '') as string;
-  }
+  private apiBaseUrl = 'https://9dfupb4d2a.execute-api.us-east-1.amazonaws.com/api';
 
   /**
-   * Generate email content using the resume generation API via Supabase Edge Function
+   * Generate email content using the resume generation API directly
    */
   async generateEmailWithResume(request: ResumeGenerationRequest): Promise<ResumeGenerationResponse> {
     try {
-      console.log('🚀 Generating email with resume using Supabase Edge Function:', request);
+      console.log('🚀 Generating email with resume using API directly:', request);
 
-      // Get current session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        throw new Error('Authentication required for resume generation');
-      }
-
-      const response = await fetch(`${this.supabaseUrl}/functions/v1/resume-generation-proxy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '') as string
-        },
-        body: JSON.stringify(request),
-      });
-
-      console.log('📡 Resume Generation Proxy Response:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Resume Generation Proxy Error:', { status: response.status, error: errorData });
+      // Use XMLHttpRequest as a fallback if fetch has CORS issues
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
         
-        // Extract error message from the proxy response
-        const errorMessage = errorData.error || `Failed to generate email: ${response.status}`;
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      console.log('✅ Email generated successfully:', data);
-
-      return data;
+        xhr.open('POST', `${this.apiBaseUrl}/upload_resume`, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        xhr.onload = function() {
+          console.log('📡 Resume Generation API Response:', xhr.status, xhr.statusText);
+          
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              console.log('✅ Email generated successfully:', data);
+              
+              resolve({
+                success: true,
+                email_body: data.email_body,
+                subject: data.subject
+              });
+            } catch (parseError) {
+              console.error('Error parsing response:', parseError);
+              reject(new Error('Invalid response format from API'));
+            }
+          } else {
+            console.error('❌ Resume Generation API Error:', { status: xhr.status, error: xhr.responseText });
+            
+            let errorMessage = 'Failed to generate email';
+            if (xhr.status === 400) {
+              errorMessage = `Invalid request: ${xhr.responseText}`;
+            } else if (xhr.status === 401) {
+              errorMessage = 'Authentication failed. Please check your API credentials.';
+            } else if (xhr.status === 403) {
+              errorMessage = 'Access forbidden. Please check your permissions.';
+            } else if (xhr.status === 429) {
+              errorMessage = 'Rate limit exceeded. Please try again later.';
+            } else if (xhr.status === 500) {
+              errorMessage = 'Server error. Please try again later or contact support.';
+            } else {
+              errorMessage = `Failed to generate email: ${xhr.status} - ${xhr.responseText}`;
+            }
+            
+            reject(new Error(errorMessage));
+          }
+        };
+        
+        xhr.onerror = function() {
+          console.error('❌ Network error during API call');
+          reject(new Error('Network error occurred while calling the API'));
+        };
+        
+        xhr.ontimeout = function() {
+          console.error('❌ Request timeout');
+          reject(new Error('Request timeout - please try again'));
+        };
+        
+        xhr.timeout = 30000; // 30 second timeout
+        
+        try {
+          xhr.send(JSON.stringify(request));
+        } catch (sendError) {
+          console.error('Error sending request:', sendError);
+          reject(new Error('Failed to send request to API'));
+        }
+      });
     } catch (error) {
       console.error('Error generating email with resume:', error);
       return {

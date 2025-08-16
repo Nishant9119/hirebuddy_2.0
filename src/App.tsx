@@ -19,6 +19,7 @@ import SignUp from "./pages/SignUp";
 import CoverLetterTest from "./pages/CoverLetterTest";
 import EmailOutreach from "./pages/EmailOutreach";
 import EmailAPITest from "./pages/EmailAPITest";
+import ResumeAPITest from "./pages/ResumeAPITest";
 import DatabaseTest from "./pages/DatabaseTest";
 import EmailConversationTest from "./pages/EmailConversationTest";
 import JobApplicationsAdmin from "./pages/JobApplicationsAdmin";
@@ -76,6 +77,7 @@ const App = () => (
             <Route path="/cover-letter-test" element={<ProtectedRoute><CoverLetterTest /></ProtectedRoute>} />
             <Route path="/email-outreach" element={<ProtectedRoute><EmailOutreach /></ProtectedRoute>} />
             <Route path="/email-api-test" element={<ProtectedRoute><EmailAPITest /></ProtectedRoute>} />
+            <Route path="/resume-api-test" element={<ProtectedRoute><ResumeAPITest /></ProtectedRoute>} />
             <Route path="/email-conversation-test" element={<ProtectedRoute><EmailConversationTest /></ProtectedRoute>} />
             <Route path="/database-test" element={<DatabaseTest />} />
             <Route path="/admin/applications" element={<ProtectedRoute><JobApplicationsAdmin /></ProtectedRoute>} />
