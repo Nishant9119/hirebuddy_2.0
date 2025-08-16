@@ -1,6 +1,7 @@
 import { EnvironmentValidator, SecureErrorHandler, InputValidator, InputSanitizer } from '../utils/security';
 import { getConfig } from '@/config/environment';
 import { supabase } from '@/lib/supabase';
+import { resumeGenerationService } from './resumeGenerationService';
 
 export interface EmailSendRequest {
   sender: string;
@@ -577,6 +578,35 @@ class EmailService {
       return this.parseAIResponse(aiResponse);
     } catch (error) {
       console.error('Error generating AI email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate email content using the resume generation API
+   * This method uses the new API endpoint for resume-based email generation
+   */
+  async generateEmailWithResume(contactName: string, companyName: string): Promise<AIEmailResponse> {
+    try {
+      console.log('🚀 Generating email using resume generation API for:', { contactName, companyName });
+
+      const response = await resumeGenerationService.generateEmailForContact(contactName, companyName);
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to generate email with resume');
+      }
+
+      if (!response.email_body || !response.subject) {
+        throw new Error('Invalid response from resume generation API');
+      }
+
+      return {
+        subject: response.subject,
+        body: response.email_body,
+        reasoning: 'Generated using resume-based API'
+      };
+    } catch (error) {
+      console.error('Error generating email with resume:', error);
       throw error;
     }
   }

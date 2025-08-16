@@ -15,6 +15,7 @@ import { ProfileCompletionWarning } from '@/components/ui/profile-completion-war
 import emailService, { EmailSendRequest, FollowUpRequest, AIEmailGenerationRequest, UserProfileData } from '@/services/emailService';
 import { ProfileService, UserProfile } from '@/services/profileService';
 import { contactsService } from '@/services/contactsService';
+import { resumeGenerationService } from '@/services/resumeGenerationService';
 import { conversationService, ContactWithConversation, EmailConversation } from '@/services/conversationService';
 import { JOB_ROLES, DEFAULT_JOB_ROLE } from '@/constants/jobRoles';
 import WhatsAppLikeConversation from './WhatsAppLikeConversation';
@@ -693,6 +694,55 @@ const AWSEmailComposer = ({
     }
   };
 
+  const generateResumeEmail = async () => {
+    if (selectedContacts.length === 0) {
+      toast({
+        title: "No Contact Selected",
+        description: "Please select a contact first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const contact = contacts.find(c => c.id === selectedContacts[0]);
+    if (!contact) return;
+
+    setIsGeneratingAI(true);
+
+    try {
+      const aiResponse = await emailService.generateEmailWithResume(contact.name, contact.company || '');
+
+      setEmailData(prev => ({
+        ...prev,
+        subject: aiResponse.subject,
+        body: aiResponse.body
+      }));
+
+      // Reset editing state to show formatted view
+      setIsEditing(false);
+
+      toast({
+        title: "Resume Email Generated",
+        description: "Email content has been generated using your resume. Review and edit as needed.",
+      });
+
+      // Show reasoning if available
+      if (aiResponse.reasoning) {
+        console.log('Resume Generation Reasoning:', aiResponse.reasoning);
+      }
+    } catch (error) {
+      console.error('Failed to generate resume email:', error);
+      
+      toast({
+        title: "Resume Email Generation Failed",
+        description: `Error: ${error instanceof Error ? error.message : 'Could not generate email content from resume'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
   const generateFollowUpAI = async () => {
     if (!selectedFollowUpContact) {
       toast({
@@ -1042,6 +1092,21 @@ const AWSEmailComposer = ({
                         <Sparkles className="h-4 w-4 text-purple-600" />
                       )}
                       {isGeneratingAI ? 'Generating...' : 'Generate with AI'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={generateResumeEmail}
+                      disabled={selectedContacts.length === 0 || isGeneratingAI}
+                      className="flex items-center gap-2 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:from-green-100 hover:to-emerald-100 text-green-700"
+                    >
+                      {isGeneratingAI ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileText className="h-4 w-4 text-green-600" />
+                      )}
+                      {isGeneratingAI ? 'Generating...' : 'Generate from Resume'}
                     </Button>
                   </div>
                 </div>

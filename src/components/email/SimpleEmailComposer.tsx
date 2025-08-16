@@ -16,8 +16,9 @@ import { checkEmailPermission, ProfileCompletionData, ExperienceData } from '@/l
 import { ProfileCompletionWarning } from '@/components/ui/profile-completion-warning';
 import emailService, { AIEmailGenerationRequest, UserProfileData } from '@/services/emailService';
 import { ProfileService, UserProfile } from '@/services/profileService';
+import { resumeGenerationService } from '@/services/resumeGenerationService';
 import { JOB_ROLES, DEFAULT_JOB_ROLE } from '@/constants/jobRoles';
-import { Send, Mail, Users, X, Loader2, Sparkles, Settings, Lightbulb, Eye } from 'lucide-react';
+import { Send, Mail, Users, X, Loader2, Sparkles, Settings, Lightbulb, Eye, FileText } from 'lucide-react';
 import EmailPreview from './EmailPreview';
 
 interface EmailContact {
@@ -182,6 +183,48 @@ const SimpleEmailComposer: React.FC<SimpleEmailComposerProps> = ({
       toast({
         title: "AI Generation Failed",
         description: `Error: ${error instanceof Error ? error.message : 'Could not generate email content'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  const generateResumeEmail = async () => {
+    if (selectedContacts.length === 0) {
+      toast({
+        title: "No Recipients",
+        description: "Cannot generate resume email without selected contacts.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For simplicity, use the first contact for resume generation
+    const contact = selectedContacts[0];
+    setIsGeneratingAI(true);
+
+    try {
+      const aiResponse = await emailService.generateEmailWithResume(contact.name, contact.company || '');
+
+      setSubject(aiResponse.subject);
+      setBody(aiResponse.body);
+
+      toast({
+        title: "Resume Email Generated",
+        description: "Email content has been generated using your resume. Review and edit as needed.",
+      });
+
+      // Show reasoning if available
+      if (aiResponse.reasoning) {
+        console.log('Resume Generation Reasoning:', aiResponse.reasoning);
+      }
+    } catch (error) {
+      console.error('Failed to generate resume email:', error);
+      
+      toast({
+        title: "Resume Email Generation Failed",
+        description: `Error: ${error instanceof Error ? error.message : 'Could not generate email content from resume'}`,
         variant: "destructive",
       });
     } finally {
@@ -425,6 +468,34 @@ const SimpleEmailComposer: React.FC<SimpleEmailComposerProps> = ({
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
                       Generate AI Email
+                    </>
+                  )}
+                </Button>
+                
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-gradient-to-r from-purple-50 to-blue-50 px-2 text-gray-500">Or</span>
+                  </div>
+                </div>
+                
+                <Button
+                  onClick={generateResumeEmail}
+                  disabled={selectedContacts.length === 0 || isGeneratingAI}
+                  variant="outline"
+                  className="w-full border-2 border-green-200 bg-green-50 hover:bg-green-100 text-green-700"
+                >
+                  {isGeneratingAI ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating Resume Email...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Generate from Resume
                     </>
                   )}
                 </Button>
